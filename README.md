@@ -18,23 +18,28 @@ Un tool CLI semplice e veloce per cambiare versione di Java su Windows con un si
 
 ## Installazione
 
-### 1. Compilare da sorgente
+### Opzione A: Scarica l'eseguibile (Consigliato)
+
+1. Vai alla pagina [Releases](https://github.com/USERNAME/java-changer/releases)
+2. Scarica l'ultima versione di `jv.exe`
+3. (Opzionale) Verifica il checksum SHA256
+4. Copia `jv.exe` in una directory nel tuo PATH (vedi sotto)
+
+### Opzione B: Compila da sorgente
 
 ```bash
 # Clone o scarica questo repository
-cd D:\Work\java-changer
+git clone https://github.com/USERNAME/java-changer.git
+cd java-changer
 
 # Scarica le dipendenze
 go mod download
 
 # Compila l'eseguibile
-go build -o jv.exe ./cmd/jv
-
-# (Opzionale) Compila con ottimizzazioni per ridurre dimensione
 go build -ldflags="-s -w" -o jv.exe ./cmd/jv
 ```
 
-### 2. Aggiungere al PATH
+### Aggiungere al PATH
 
 Per usare `jv` da qualsiasi directory:
 

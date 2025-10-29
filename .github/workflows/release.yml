@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (v1.0.0, v1.1.0, etc.)
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="v0.0.0-dev"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build Windows executable
+        run: |
+          go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.version }}" -o jv.exe ./cmd/jv
+        env:
+          CGO_ENABLED: 0
+          GOOS: windows
+          GOARCH: amd64
+
+      - name: Test executable
+        run: |
+          .\jv.exe help
+
+      - name: Create release archive
+        shell: bash
+        run: |
+          mkdir -p release
+          cp jv.exe release/
+          cp README.md release/
+          cp QUICKSTART.md release/
+          cd release
+          7z a -tzip ../jv-${{ steps.version.outputs.version }}-windows-amd64.zip *
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          cd release
+          sha256sum jv.exe > ../checksums.txt
+          cd ..
+          sha256sum jv-${{ steps.version.outputs.version }}-windows-amd64.zip >> checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            jv-${{ steps.version.outputs.version }}-windows-amd64.zip
+            jv.exe
+            checksums.txt
+          body: |
+            ## Java Version Switcher ${{ steps.version.outputs.version }}
+
+            ### Installation
+
+            1. Download `jv.exe` from the assets below
+            2. Copy it to a directory in your PATH (e.g., `C:\Windows\System32`)
+            3. Run `jv help` to see available commands
+
+            ### What's New
+
+            - Easy Java version switching for Windows
+            - Auto-detection of Java installations
+            - Custom search paths support
+            - Persistent configuration
+
+            ### Usage
+
+            ```bash
+            jv list              # List available Java versions
+            jv use 17            # Switch to Java 17
+            jv current           # Show current version
+            jv add-path C:\Java  # Add custom search path
+            ```
+
+            **Note:** Run as administrator when switching Java versions.
+
+            ### Files
+
+            - `jv.exe` - Standalone executable (recommended)
+            - `jv-${{ steps.version.outputs.version }}-windows-amd64.zip` - Archive with executable + docs
+            - `checksums.txt` - SHA256 checksums for verification
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jv-windows-amd64
+          path: |
+            jv.exe
+            jv-${{ steps.version.outputs.version }}-windows-amd64.zip
+            checksums.txt
