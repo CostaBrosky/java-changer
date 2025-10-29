@@ -38,6 +38,8 @@ func main() {
 		handleRemovePath()
 	case "list-paths":
 		handleListPaths()
+	case "init":
+		handleInit()
 	case "version", "-v", "--version":
 		printVersion()
 	case "help", "-h", "--help":
@@ -326,6 +328,133 @@ func handleListPaths() {
 	}
 }
 
+func handleInit() {
+	fmt.Println("Initializing Java environment...")
+	fmt.Println()
+
+	// Check if running as administrator
+	isAdmin := env.IsAdmin()
+	if !isAdmin {
+		fmt.Println("WARNING: Running without administrator privileges.")
+		fmt.Println("Some operations may fail. For full initialization, run as administrator.")
+		fmt.Println()
+	}
+
+	// Find all Java installations
+	detector := java.NewDetector()
+	versions, err := detector.FindAll()
+	if err != nil {
+		fmt.Printf("Error finding Java versions: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(versions) == 0 {
+		fmt.Println("No Java installations found.")
+		fmt.Println()
+		fmt.Println("To install Java automatically, run:")
+		fmt.Println("  PowerShell: irm https://raw.githubusercontent.com/USER/java-changer/main/install.ps1 | iex")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found %d Java installation(s):\n", len(versions))
+	for i, v := range versions {
+		fmt.Printf("  [%d] %s - %s\n", i+1, v.Version, v.Path)
+	}
+	fmt.Println()
+
+	// Check JAVA_HOME
+	currentJavaHome := os.Getenv("JAVA_HOME")
+	javaHomeValid := false
+	javaHomeExists := currentJavaHome != ""
+
+	if javaHomeExists {
+		javaHomeValid = detector.IsValidJavaPath(currentJavaHome)
+		if javaHomeValid {
+			fmt.Printf("✓ JAVA_HOME is set: %s\n", currentJavaHome)
+		} else {
+			fmt.Printf("✗ JAVA_HOME is set but invalid: %s\n", currentJavaHome)
+		}
+	} else {
+		fmt.Println("✗ JAVA_HOME is not set")
+	}
+
+	// Check PATH
+	pathEnv := os.Getenv("PATH")
+	hasJavaInPath := strings.Contains(strings.ToLower(pathEnv), "java")
+	hasJavaHomeInPath := strings.Contains(pathEnv, "%JAVA_HOME%\\bin") || strings.Contains(pathEnv, "%JAVA_HOME%/bin")
+
+	if hasJavaHomeInPath {
+		fmt.Println("✓ %JAVA_HOME%\\bin is in PATH")
+	} else if hasJavaInPath {
+		fmt.Println("⚠ PATH contains Java, but not via %JAVA_HOME%\\bin")
+	} else {
+		fmt.Println("✗ No Java found in PATH")
+	}
+	fmt.Println()
+
+	// Determine what needs to be done
+	needsSetup := !javaHomeExists || !javaHomeValid || !hasJavaHomeInPath
+
+	if !needsSetup {
+		fmt.Println("Environment is already configured correctly!")
+		fmt.Println("No changes needed.")
+		return
+	}
+
+	// Interactive setup
+	fmt.Println("The following issues were found:")
+	if !javaHomeExists {
+		fmt.Println("  - JAVA_HOME is not set")
+	} else if !javaHomeValid {
+		fmt.Println("  - JAVA_HOME points to invalid location")
+	}
+	if !hasJavaHomeInPath {
+		fmt.Println("  - %JAVA_HOME%\\bin is not in PATH")
+	}
+	fmt.Println()
+
+	// Ask which Java to use
+	fmt.Println("Select Java installation to configure:")
+	for i, v := range versions {
+		fmt.Printf("  [%d] %s - %s\n", i+1, v.Version, v.Path)
+	}
+	fmt.Print("\nEnter selection [1]: ")
+
+	var selection int
+	fmt.Scanln(&selection)
+	if selection < 1 || selection > len(versions) {
+		selection = 1
+	}
+
+	selectedJava := versions[selection-1]
+	fmt.Printf("\nConfiguring environment for Java %s...\n", selectedJava.Version)
+
+	if !isAdmin {
+		fmt.Println()
+		fmt.Println("ERROR: Administrator privileges required to modify system environment variables.")
+		fmt.Println("Please run this command as administrator:")
+		fmt.Println("  1. Right-click CMD/PowerShell")
+		fmt.Println("  2. Select 'Run as administrator'")
+		fmt.Println("  3. Run: jv init")
+		os.Exit(1)
+	}
+
+	// Set JAVA_HOME and update PATH
+	if err := env.SetJavaHome(selectedJava.Path); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println()
+	fmt.Println("✓ Environment initialized successfully!")
+	fmt.Println()
+	fmt.Println("Changes made:")
+	fmt.Printf("  - JAVA_HOME = %s\n", selectedJava.Path)
+	fmt.Println("  - Added %JAVA_HOME%\\bin to PATH")
+	fmt.Println()
+	fmt.Println("Note: You may need to restart your terminal for changes to take effect.")
+}
+
 func printVersion() {
 	fmt.Printf("Java Version Switcher (jv) version %s\n", Version)
 	fmt.Println("https://github.com/user/java-changer")
@@ -350,6 +479,9 @@ func printUsage() {
 	fmt.Println("    add-path <dir>    Add directory to search for Java installations")
 	fmt.Println("    remove-path <dir> Remove directory from search paths")
 	fmt.Println("    list-paths        Show all search paths (standard + custom)")
+	fmt.Println()
+	fmt.Println("  Setup & Maintenance:")
+	fmt.Println("    init              Initialize/repair Java environment variables")
 	fmt.Println()
 	fmt.Println("  Other:")
 	fmt.Println("    version           Show version information")
