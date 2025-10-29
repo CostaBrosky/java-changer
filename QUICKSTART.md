@@ -51,6 +51,10 @@ java -version
 ## Main Commands
 
 ```bash
+# Installation & Setup
+jv install                      # Install Java from open-source distributors
+jv init                         # Initialize/repair Java environment variables
+
 # Version management
 jv list                         # List all available versions
 jv use 17                       # Switch to Java 17
@@ -102,7 +106,8 @@ If you see the help message, installation succeeded!
 - Run the terminal as administrator
 
 **"No Java installations found"**
-- Manually add: `jv add C:\path\to\jdk`
+- Install Java: `jv install`
+- Or manually add: `jv add C:\path\to\jdk`
 
 ---
 

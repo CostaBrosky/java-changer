@@ -148,17 +148,27 @@ If you're concerned about security, you can always **build from source** (see Me
 # 1. List all available Java versions
 jv list
 
-# 2. Switch to Java 17 (RUN AS ADMINISTRATOR!)
+# 2. If no Java found, install Java (interactive)
+jv install
+
+# 3. Switch to Java 17 (RUN AS ADMINISTRATOR!)
 jv use 17
 
-# 3. Verify current version
+# 4. Verify current version
 jv current
 java -version
 ```
 
-**IMPORTANT**: The `jv use` command requires administrator privileges. Right-click on CMD/PowerShell → "Run as administrator"
+**IMPORTANT**: The `jv use` and `jv install` commands require administrator privileges for system-wide configuration. Right-click on CMD/PowerShell → "Run as administrator"
 
 ## Commands
+
+### Installation & Setup
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `jv install` | Install Java from open-source distributors (Adoptium, etc.) | `jv install` |
+| `jv init` | Initialize/repair Java environment variables | `jv init` |
 
 ### Version Management
 
@@ -191,6 +201,27 @@ java -version
 | `jv help` | Show help message |
 
 ## Examples
+
+### Scenario 0: Installing Java (new feature!)
+
+If you don't have Java installed or need additional versions:
+
+```bash
+# Interactive installation from open-source distributors
+jv install
+
+# The tool will guide you through:
+# 1. Selecting a distributor (Adoptium/Temurin, Azul Zulu, etc.)
+# 2. Choosing a Java version (LTS or feature releases)
+# 3. Downloading and installing automatically
+# 4. Configuring JAVA_HOME if not set
+
+# After installation, the new version will be available
+jv list
+jv use 21
+```
+
+**Note**: `jv install` currently supports Eclipse Adoptium (Temurin). More distributors coming soon!
 
 ### Scenario 1: Switching between standard versions
 

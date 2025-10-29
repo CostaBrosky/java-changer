@@ -3,19 +3,13 @@
 Installer for Java Version Switcher (jv)
 
 .DESCRIPTION
-Downloads and installs jv.exe with optional Java JDK download from Eclipse Adoptium.
+Downloads and installs jv.exe. Java installations can be managed using 'jv install' command.
 
 .PARAMETER Version
 Version of jv to install (default: latest)
 
-.PARAMETER JavaVersion
-Java version to download if not found. Options: 8, 11, 17, 21 (default: 21)
-
 .PARAMETER InstallDir
 Installation directory (default: $HOME\.local\bin)
-
-.PARAMETER NoJava
-Skip Java detection and download prompt
 
 .PARAMETER NoModifyPath
 Don't add to PATH environment variable
@@ -27,25 +21,15 @@ Non-interactive mode, uses all defaults
 irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 
 .EXAMPLE
-irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-JavaVersion", "17"
-
-.EXAMPLE
-.\install.ps1 -Silent -JavaVersion 21
+.\install.ps1
 #>
 
 param(
     [Parameter(HelpMessage = "Version of jv to install")]
     [string]$Version = "latest",
 
-    [Parameter(HelpMessage = "Java version to download if not found")]
-    [ValidateSet("8", "11", "17", "21")]
-    [string]$JavaVersion = "21",
-
     [Parameter(HelpMessage = "Installation directory")]
     [string]$InstallDir,
-
-    [Parameter(HelpMessage = "Skip Java download prompt")]
-    [switch]$NoJava,
 
     [Parameter(HelpMessage = "Don't modify PATH")]
     [switch]$NoModifyPath,
@@ -58,7 +42,6 @@ $ErrorActionPreference = "Stop"
 
 # Constants
 $GITHUB_REPO = "CostaBrosky/jv"
-$ADOPTIUM_API = "https://api.adoptium.net/v3"
 
 # Colors for output
 function Write-Info($message) {
@@ -296,107 +279,6 @@ function Find-JavaInstallations {
     return $found
 }
 
-# Download Java JDK from Eclipse Adoptium
-function DownloadJava($version, $arch) {
-    Write-Info "Downloading Java $version from Eclipse Adoptium..."
-
-    try {
-        # Query Adoptium API
-        $apiUrl = "$ADOPTIUM_API/assets/latest/$version/hotspot"
-        $params = "?architecture=$arch&image_type=jdk&os=windows&vendor=eclipse"
-
-        Write-Info "Querying Adoptium API..."
-        $jdkInfo = Invoke-RestMethod -Uri "$apiUrl$params" -ErrorAction Stop
-
-        if ($jdkInfo.Count -eq 0) {
-            throw "No JDK found for Java $version on $arch"
-        }
-
-        $binary = $jdkInfo[0].binary
-        $downloadUrl = $binary.package.link
-        $checksum = $binary.package.checksum
-        $size = [math]::Round($binary.package.size / 1MB, 2)
-        $jdkVersion = $jdkInfo[0].version.openjdk_version
-
-        Write-Info "Found JDK $jdkVersion"
-        Write-Info "Size: $size MB"
-
-        $tempDir = Join-Path $env:TEMP "jv-install"
-        $zipPath = Join-Path $tempDir "jdk-$version.zip"
-
-        Write-Info "Downloading JDK... (this may take a few minutes)"
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -ErrorAction Stop
-
-        # Verify checksum
-        Write-Info "Verifying checksum..."
-        $actualHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
-        if ($actualHash -ne $checksum.ToLower()) {
-            Remove-Item $zipPath -ErrorAction SilentlyContinue
-            throw "Checksum verification failed! Expected: $checksum, Got: $actualHash"
-        }
-        Write-Success "Checksum verified"
-
-        # Determine installation directory
-        # Try Program Files first (requires admin), fallback to user directory
-        $isAdmin = Test-Administrator
-        if ($isAdmin) {
-            $javaInstallBase = "C:\Program Files\Eclipse Adoptium"
-        } else {
-            Write-Warn "Not running as administrator, installing to user directory"
-            $javaInstallBase = Join-Path $HOME ".jv"
-        }
-
-        if (-not (Test-Path $javaInstallBase)) {
-            New-Item -ItemType Directory -Path $javaInstallBase -Force | Out-Null
-        }
-
-        # Extract to temp location first
-        Write-Info "Extracting JDK..."
-        $tempExtractDir = Join-Path $tempDir "extract"
-        if (Test-Path $tempExtractDir) {
-            Remove-Item -Path $tempExtractDir -Recurse -Force
-        }
-        Expand-Archive -Path $zipPath -DestinationPath $tempExtractDir -Force
-
-        # Find the extracted directory
-        $extractedDirs = Get-ChildItem -Path $tempExtractDir -Directory | Where-Object { $_.Name -match "jdk" }
-        if ($extractedDirs.Count -eq 0) {
-            throw "Failed to find extracted JDK directory"
-        }
-
-        $extractedJdkPath = $extractedDirs[0].FullName
-
-        # Verify bin\java.exe exists
-        $javaExe = Join-Path $extractedJdkPath "bin\java.exe"
-        if (-not (Test-Path $javaExe)) {
-            throw "Invalid JDK structure: bin\java.exe not found in $extractedJdkPath"
-        }
-
-        # Create a clean directory name: jdk-<version>
-        $cleanDirName = "jdk-$version"
-        $finalJdkPath = Join-Path $javaInstallBase $cleanDirName
-
-        # Remove old installation if exists
-        if (Test-Path $finalJdkPath) {
-            Write-Info "Removing existing installation at $finalJdkPath"
-            Remove-Item -Path $finalJdkPath -Recurse -Force
-        }
-
-        # Move to final location
-        Move-Item -Path $extractedJdkPath -Destination $finalJdkPath -Force
-
-        # Cleanup
-        Remove-Item $zipPath -ErrorAction SilentlyContinue
-        Remove-Item $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
-
-        Write-Success "Java $version installed to: $finalJdkPath"
-        return $finalJdkPath
-    }
-    catch {
-        throw "Failed to download Java: $_"
-    }
-}
-
 # Install jv.exe (XDG-compliant)
 function Install-JV($binPath, $binDir) {
     Write-Info "Installing jv to $binDir..."
@@ -412,63 +294,6 @@ function Install-JV($binPath, $binDir) {
 
     Write-Success "Installed jv.exe to: $targetPath"
     return $binDir
-}
-
-# Set Java environment variables (JAVA_HOME and PATH)
-function Set-JavaEnvironment($javaPath) {
-    Write-Info "Setting up Java environment variables..."
-
-    if (-not (Test-Administrator)) {
-        Write-Warn "Administrator privileges required to set system environment variables"
-        Write-Warn "JAVA_HOME will not be set automatically. You can set it manually or run 'jv use <version>' as administrator"
-        return $false
-    }
-
-    try {
-        # Verify Java installation
-        $javaExe = Join-Path $javaPath "bin\java.exe"
-        if (-not (Test-Path $javaExe)) {
-            Write-Warn "Java executable not found at $javaExe, skipping environment setup"
-            return $false
-        }
-
-        # Set JAVA_HOME at system level
-        $regPath = "HKLM:\System\CurrentControlSet\Control\Session Manager\Environment"
-
-        Write-Info "Setting JAVA_HOME to: $javaPath"
-        Set-ItemProperty -Path $regPath -Name "JAVA_HOME" -Value $javaPath -ErrorAction Stop
-
-        # Update system PATH
-        $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-        $paths = $currentPath -split ";" | Where-Object { $_ -ne "" }
-
-        # Remove old Java paths
-        $filteredPaths = $paths | Where-Object {
-            $_ -notmatch "java" -and
-            $_ -notmatch "jdk" -and
-            $_ -notmatch "jre" -and
-            $_ -ne "%JAVA_HOME%\bin"
-        }
-
-        # Add %JAVA_HOME%\bin at the beginning
-        $newPaths = @("%JAVA_HOME%\bin") + $filteredPaths
-        $newPath = $newPaths -join ";"
-
-        Write-Info "Adding %JAVA_HOME%\bin to system PATH"
-        Set-ItemProperty -Path $regPath -Name "Path" -Value $newPath -ErrorAction Stop
-
-        # Broadcast environment change
-        BroadcastEnvironmentChange
-
-        Write-Success "Java environment variables set successfully"
-        Write-Success "JAVA_HOME = $javaPath"
-        Write-Success "Added %JAVA_HOME%\bin to system PATH"
-        return $true
-    }
-    catch {
-        Write-Err "Failed to set Java environment variables: $_"
-        return $false
-    }
 }
 
 # Add directory to user PATH
@@ -563,31 +388,8 @@ try {
 
     # Check for admin privileges and offer to elevate
     $isAdmin = Test-Administrator
-    if (-not $isAdmin -and -not $Silent) {
-        Write-Host ""
-        Write-Warn "Not running as Administrator"
-        Write-Host ""
-        Write-Host "Administrator privileges are recommended for:" -ForegroundColor Yellow
-        Write-Host "  - Installing Java to Program Files" -ForegroundColor Yellow
-        Write-Host "  - Setting JAVA_HOME system variable" -ForegroundColor Yellow
-        Write-Host "  - Adding Java to system PATH" -ForegroundColor Yellow
-        Write-Host ""
-        $response = Read-Host "Would you like to restart with administrator privileges? (Y/n)"
-
-        if ($response -eq "" -or $response -eq "y" -or $response -eq "Y") {
-            # Build argument list
-            $scriptArgs = @()
-            if ($Version -ne "latest") { $scriptArgs += "-Version", $Version }
-            if ($JavaVersion -ne "21") { $scriptArgs += "-JavaVersion", $JavaVersion }
-            if ($InstallDir) { $scriptArgs += "-InstallDir", $InstallDir }
-            if ($NoJava) { $scriptArgs += "-NoJava" }
-            if ($NoModifyPath) { $scriptArgs += "-NoModifyPath" }
-
-            Invoke-ElevatedScript -Arguments $scriptArgs
-        }
-
-        Write-Info "Continuing with limited installation (user-level only)..."
-    }
+    # Note: Admin privileges are not required for jv tool installation
+    # Only Java environment configuration (via 'jv install' or 'jv init') requires admin
 
     Initialize-Environment
 
@@ -600,24 +402,8 @@ try {
     # Download jv.exe
     $jvPath = DownloadJv -version $Version -arch $arch
 
-    # Check for Java installations
+    # Detect existing Java installations for initial config
     $javaInstalls = Find-JavaInstallations
-    $downloadedJava = $null
-
-    if ($javaInstalls.Count -eq 0 -and -not $NoJava) {
-        $downloadJava = $true
-
-        if (-not $Silent) {
-            Write-Host ""
-            $response = Read-Host "No Java installation found. Download Java $JavaVersion? (Y/n)"
-            $downloadJava = ($response -eq "" -or $response -eq "y" -or $response -eq "Y")
-        }
-
-        if ($downloadJava) {
-            $downloadedJava = DownloadJava -version $JavaVersion -arch $arch
-            $javaInstalls += $downloadedJava
-        }
-    }
 
     # Install jv.exe to ~/.local/bin
     $binDir = Install-JV -binPath $jvPath -binDir $finalInstallDir
@@ -628,13 +414,7 @@ try {
         $pathModified = Add-ToPath -directory $binDir
     }
 
-    # Set Java environment variables if Java was downloaded
-    $javaEnvSet = $false
-    if ($downloadedJava) {
-        $javaEnvSet = Set-JavaEnvironment -javaPath $downloadedJava
-    }
-
-    # Create config in ~/.config/jv/
+    # Create config in ~/.config/jv/ with detected Java installations
     $configPath = Initialize-Config -javaInstallations $javaInstalls
 
     # Cleanup
@@ -656,39 +436,32 @@ try {
         Write-Info "$binDir already in user PATH"
     }
 
-    if ($downloadedJava) {
-        Write-Success "Java $JavaVersion installed to: $downloadedJava"
-
-        if ($javaEnvSet) {
-            Write-Success "JAVA_HOME and system PATH configured"
-        } else {
-            Write-Warn "JAVA_HOME not set (requires administrator privileges)"
-        }
+    if ($javaInstalls.Count -gt 0) {
+        Write-Success "Found $($javaInstalls.Count) existing Java installation(s)"
     }
 
     Write-Host ""
     Write-Host "Installation Summary:" -ForegroundColor Yellow
     Write-Host "  Executable: $binDir\jv.exe" -ForegroundColor Cyan
     Write-Host "  Config:     $configPath" -ForegroundColor Cyan
-    if ($javaEnvSet) {
-        Write-Host "  JAVA_HOME:  $downloadedJava" -ForegroundColor Cyan
-        Write-Host "  PATH:       Includes %JAVA_HOME%\bin" -ForegroundColor Cyan
-    }
 
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Yellow
     Write-Host "  1. Restart your terminal to reload environment variables"
     Write-Host "     (or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User'))"
-    Write-Host "  2. Run: jv list"
-
-    if ($javaEnvSet) {
-        Write-Host "  3. Java is ready to use! (JAVA_HOME already configured)" -ForegroundColor Green
+    Write-Host "  2. Run: jv list          (see detected Java installations)"
+    
+    if ($javaInstalls.Count -eq 0) {
+        Write-Host "  3. Run: jv install       (install Java from open-source distributors)" -ForegroundColor Cyan
+        Write-Host "  4. Run: jv use <version> (switch Java version)" -ForegroundColor Cyan
     } else {
-        Write-Host "  3. Switch Java version: jv use $JavaVersion  (requires administrator)" -ForegroundColor Cyan
+        Write-Host "  3. Run: jv use <version> (switch Java version)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "To install additional Java versions: jv install" -ForegroundColor Gray
     }
 
     Write-Host ""
-    Write-Host "For help: jv help" -ForegroundColor Gray
+    Write-Host "For more information: jv help" -ForegroundColor Gray
     Write-Host ""
 }
 catch {

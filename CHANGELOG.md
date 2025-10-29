@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `C:\Program Files\Zulu`
   - `C:\Program Files\Amazon Corretto`
   - `C:\Program Files\Microsoft`
-  - `C:\DevTools\Java`
 - Custom search paths support via `add-path` command
 - Permanent system environment variable modification (JAVA_HOME and PATH)
 - Commands:

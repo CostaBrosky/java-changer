@@ -7,6 +7,7 @@ import (
 
 	"jv/internal/config"
 	"jv/internal/env"
+	"jv/internal/installer"
 	"jv/internal/java"
 )
 
@@ -40,6 +41,8 @@ func main() {
 		handleListPaths()
 	case "init":
 		handleInit()
+	case "install":
+		handleInstall()
 	case "version", "-v", "--version":
 		printVersion()
 	case "help", "-h", "--help":
@@ -455,6 +458,24 @@ func handleInit() {
 	fmt.Println("Note: You may need to restart your terminal for changes to take effect.")
 }
 
+func handleInstall() {
+	// Check admin privileges
+	isAdmin := env.IsAdmin()
+
+	// Create installer
+	inst, err := installer.NewInstaller(isAdmin)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Run interactive installation
+	if err := inst.Run(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func printVersion() {
 	fmt.Printf("Java Version Switcher (jv) version %s\n", Version)
 	fmt.Println("https://github.com/CostaBrosky/jv")
@@ -481,6 +502,7 @@ func printUsage() {
 	fmt.Println("    list-paths        Show all search paths (standard + custom)")
 	fmt.Println()
 	fmt.Println("  Setup & Maintenance:")
+	fmt.Println("    install           Install Java from open-source distributors")
 	fmt.Println("    init              Initialize/repair Java environment variables")
 	fmt.Println()
 	fmt.Println("  Other:")

@@ -9,9 +9,18 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	CustomPaths []string `json:"custom_paths"` // Specific Java installation paths
-	SearchPaths []string `json:"search_paths"` // Base directories to scan for Java installations
-	configPath  string
+	CustomPaths   []string       `json:"custom_paths"`   // Specific Java installation paths
+	SearchPaths   []string       `json:"search_paths"`   // Base directories to scan for Java installations
+	InstalledJDKs []InstalledJDK `json:"installed_jdks"` // JDKs installed via jv install
+	configPath    string
+}
+
+// InstalledJDK represents a JDK installed through jv install command
+type InstalledJDK struct {
+	Version     string `json:"version"`
+	Path        string `json:"path"`
+	Distributor string `json:"distributor"`
+	InstalledAt string `json:"installed_at"`
 }
 
 // Load loads the configuration from the user's home directory
@@ -19,9 +28,10 @@ func Load() (*Config, error) {
 	configPath := getConfigPath()
 
 	cfg := &Config{
-		CustomPaths: make([]string, 0),
-		SearchPaths: make([]string, 0),
-		configPath:  configPath,
+		CustomPaths:   make([]string, 0),
+		SearchPaths:   make([]string, 0),
+		InstalledJDKs: make([]InstalledJDK, 0),
+		configPath:    configPath,
 	}
 
 	// If config file doesn't exist, return empty config
@@ -138,6 +148,47 @@ func (c *Config) HasSearchPath(path string) bool {
 		}
 	}
 	return false
+}
+
+// AddInstalledJDK adds a JDK to the installed list
+func (c *Config) AddInstalledJDK(jdk InstalledJDK) {
+	// Normalize path
+	jdk.Path = filepath.Clean(jdk.Path)
+
+	// Check if already exists (by path)
+	for i, existing := range c.InstalledJDKs {
+		if strings.EqualFold(existing.Path, jdk.Path) {
+			// Update existing entry
+			c.InstalledJDKs[i] = jdk
+			return
+		}
+	}
+
+	c.InstalledJDKs = append(c.InstalledJDKs, jdk)
+}
+
+// RemoveInstalledJDK removes a JDK from the installed list
+func (c *Config) RemoveInstalledJDK(path string) {
+	path = filepath.Clean(path)
+
+	for i, jdk := range c.InstalledJDKs {
+		if strings.EqualFold(jdk.Path, path) {
+			c.InstalledJDKs = append(c.InstalledJDKs[:i], c.InstalledJDKs[i+1:]...)
+			return
+		}
+	}
+}
+
+// GetInstalledJDK returns the installed JDK info for a given path
+func (c *Config) GetInstalledJDK(path string) *InstalledJDK {
+	path = filepath.Clean(path)
+
+	for _, jdk := range c.InstalledJDKs {
+		if strings.EqualFold(jdk.Path, path) {
+			return &jdk
+		}
+	}
+	return nil
 }
 
 // getConfigPath returns the path to the configuration file

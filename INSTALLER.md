@@ -4,7 +4,7 @@ Technical documentation for the Java Version Switcher PowerShell installer scrip
 
 ## Overview
 
-The `install.ps1` script provides automated installation of `jv` with optional Java JDK download from Eclipse Adoptium. It follows modern PowerShell installer patterns inspired by tools like UV (Astral's Python tool) and Rustup.
+The `install.ps1` script provides automated installation of `jv`. Java installations can be managed separately using the `jv install` command. The script follows modern PowerShell installer patterns inspired by tools like UV (Astral's Python tool) and Rustup.
 
 ## Features
 
@@ -12,12 +12,10 @@ The `install.ps1` script provides automated installation of `jv` with optional J
 - ✅ Downloads jv.exe from GitHub releases
 - ✅ Auto-detects Windows architecture (x64, x86, ARM64)
 - ✅ Scans for existing Java installations
-- ✅ Optional Java download from Eclipse Adoptium API
 - ✅ Automatic PATH configuration
-- ✅ Creates initial `.javarc` configuration
+- ✅ Creates initial configuration file
 - ✅ Interactive and silent modes
-- ✅ SHA256 checksum verification
-- ✅ Environment variable broadcast to Windows
+- ✅ Lightweight and focused (Java management via `jv install` command)
 
 ## Usage
 
@@ -33,30 +31,28 @@ irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `-Version` | string | "latest" | Version of jv to install |
-| `-JavaVersion` | string | "21" | Java version to download (8, 11, 17, 21) |
 | `-InstallDir` | string | `$HOME\.local\bin` | Installation directory |
-| `-NoJava` | switch | false | Skip Java download prompt |
 | `-NoModifyPath` | switch | false | Don't modify PATH |
 | `-Silent` | switch | false | Non-interactive mode |
 
 ### Examples
 
 ```powershell
-# Install with Java 17
-irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-JavaVersion", "17"
+# Basic installation
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 
 # Silent installation for CI/CD
-irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "21"
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-Silent"
 
 # Custom installation directory
 irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-InstallDir", "C:\tools"
 
-# Skip Java download entirely
-irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-NoJava"
-
 # Download script and run locally
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 -OutFile install.ps1
-.\install.ps1 -JavaVersion 17
+.\install.ps1
+
+# After installation, use jv to install Java
+jv install
 ```
 
 ## Installation Flow
@@ -98,39 +94,13 @@ C:\Program Files\Microsoft
 
 Validates each directory for `bin\java.exe` existence.
 
-### 5. Java Download (Optional)
-
-If no Java found and not skipped:
-
-**Interactive Mode**: Prompts user
-```
-No Java installation found. Download Java 21? (Y/n)
-```
-
-**Silent Mode**: Automatically downloads
-
-**Download Process**:
-1. Query Eclipse Adoptium API:
-   ```
-   GET https://api.adoptium.net/v3/assets/latest/{version}/hotspot
-       ?architecture={arch}&image_type=jdk&os=windows&vendor=eclipse
-   ```
-
-2. Download ZIP archive
-
-3. **Verify SHA256 checksum** (critical for security)
-
-4. Extract to `$HOME\.jv\jdk-{version}`
-
-5. Add to installation list
-
-### 6. Installation
+### 5. Installation
 
 - Creates install directory if not exists
 - Copies `jv.exe` to install directory
 - Destination: `{InstallDir}\jv.exe`
 
-### 7. PATH Modification
+### 6. PATH Modification
 
 If not skipped:
 - Reads current user PATH from registry (`HKCU:\Environment`)
@@ -141,22 +111,62 @@ If not skipped:
 
 **Registry Path**: `HKEY_CURRENT_USER\Environment\Path`
 
-### 8. Configuration
+### 7. Configuration
 
-Creates `%USERPROFILE%\.javarc` with:
+Creates `%USERPROFILE%\.config\jv\jv.json` with detected Java installations:
 ```json
 {
   "custom_paths": [
-    "C:\\Users\\username\\.jv\\jdk-21\\jdk-21+35"
+    "C:\\Program Files\\Java\\jdk-17",
+    "C:\\Program Files\\Eclipse Adoptium\\jdk-21"
   ],
-  "search_paths": []
+  "search_paths": [],
+  "installed_jdks": []
 }
 ```
 
-### 9. Cleanup
+The `installed_jdks` array will be populated when using `jv install` command.
+
+### 8. Cleanup
 
 - Removes temporary download directory
 - Displays success message and next steps
+
+## Java Installation via `jv install`
+
+After installing the `jv` tool, Java distributions can be installed using the `jv install` command.
+
+### Features
+
+- **Interactive distributor selection**: Choose from Eclipse Adoptium, Azul Zulu, Amazon Corretto, etc.
+- **Version menu**: Shows LTS and feature releases
+- **Installed version detection**: Marks already-installed versions
+- **Automatic download & extraction**: Downloads, verifies checksum, and extracts JDK
+- **Smart installation location**:
+  - With admin: `C:\Program Files\{Distributor}\jdk-{version}`
+  - Without admin: `%USERPROFILE%\.jv\jdk-{version}`
+- **Auto-configuration**: Sets JAVA_HOME if not already set (requires admin)
+
+### Usage
+
+```bash
+# Interactive installation
+jv install
+
+# Follow the prompts to:
+# 1. Select distributor (currently: Eclipse Adoptium)
+# 2. Choose Java version (LTS or feature release)
+# 3. Download and install automatically
+```
+
+### Supported Distributors
+
+| Distributor | Status | Notes |
+|-------------|--------|-------|
+| Eclipse Adoptium (Temurin) | ✅ Active | Default, well-supported |
+| Azul Zulu | 🔜 Coming Soon | Planned |
+| Amazon Corretto | 🔜 Coming Soon | Planned |
+| Microsoft Build of OpenJDK | 🔜 Coming Soon | Planned |
 
 ## Technical Details
 
