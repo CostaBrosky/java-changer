@@ -72,6 +72,76 @@ copy jv.exe C:\tools\
 6. Click "OK" on all windows
 7. **Restart your terminal**
 
+## 🛡️ Windows SmartScreen & Security Warning
+
+### Why does Windows block this executable?
+
+When you download `jv.exe`, **Windows SmartScreen will show a security warning** because the executable is **not digitally signed**. This is normal and expected for open-source tools without a code signing certificate (which costs $200-500/year).
+
+**This does NOT mean the file is malicious** - it simply means Windows doesn't recognize the publisher.
+
+### How to download and use jv.exe safely
+
+#### Step 1: Download the file
+
+1. Download `jv.exe` from the [Releases](https://github.com/USERNAME/java-changer/releases) page
+2. Windows SmartScreen may show: **"Windows protected your PC"**
+3. Click **"More info"**
+4. Click **"Run anyway"**
+
+#### Step 2: If Windows Defender quarantines the file
+
+Windows Defender may automatically move `jv.exe` to quarantine. To restore it:
+
+1. Open **Windows Security** (search in Start menu)
+2. Go to **"Virus & threat protection"**
+3. Click **"Protection history"**
+4. Find the `jv.exe` entry
+5. Click **"Actions"** → **"Restore"**
+6. Confirm the action
+
+#### Step 3: Add a permanent exception (recommended)
+
+To prevent Windows Defender from blocking `jv.exe` in the future:
+
+1. Open **Windows Security**
+2. Go to **"Virus & threat protection"**
+3. Click **"Manage settings"** under "Virus & threat protection settings"
+4. Scroll down to **"Exclusions"**
+5. Click **"Add or remove exclusions"**
+6. Click **"Add an exclusion"** → **"File"**
+7. Navigate to and select `jv.exe` (e.g., `C:\tools\jv.exe`)
+8. Click **"Open"**
+
+Now Windows Defender will not scan or quarantine this file.
+
+#### Step 4: Verify file authenticity (optional but recommended)
+
+To ensure the file hasn't been tampered with, verify the SHA256 checksum:
+
+```powershell
+# In PowerShell, navigate to where you downloaded jv.exe
+cd C:\tools
+
+# Calculate the checksum
+Get-FileHash jv.exe -Algorithm SHA256
+
+# Compare the output with checksums.txt from the GitHub release
+```
+
+The checksum should match exactly with the one in `checksums.txt` from the release.
+
+### Why don't you sign the executable?
+
+Code signing certificates for Windows cost $200-500 per year and require identity verification. For a free, open-source tool, this cost is not justified. Instead:
+
+- ✅ All source code is **publicly available** on GitHub for audit
+- ✅ **SHA256 checksums** are provided to verify file integrity
+- ✅ The build process is **transparent** (you can build from source yourself)
+- ✅ The project is **open source** under MIT license
+
+If you're concerned about security, you can always **build from source** (see Method 2 in Installation).
+
 ## ⚡ Quick Start
 
 ```bash
