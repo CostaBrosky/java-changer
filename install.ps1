@@ -182,19 +182,16 @@ function Get-WindowsArchitecture {
     }
 }
 
-# Get install directory
+# Get install directory (XDG-compliant)
 function Get-InstallDirectory {
     if ($InstallDir) {
         return $InstallDir
     }
 
-    # Follow XDG pattern, fallback to C:\tools for Windows users
-    $xdgBinHome = $env:XDG_BIN_HOME
-    if ($xdgBinHome) {
-        return $xdgBinHome
-    }
-
+    # Follow XDG Base Directory specification
+    # Executable: $HOME/.local/bin/jv.exe
     $localBin = Join-Path $HOME ".local\bin"
+
     return $localBin
 }
 
@@ -400,19 +397,21 @@ function DownloadJava($version, $arch) {
     }
 }
 
-# Install jv.exe
-function Install-JV($binPath, $installDir) {
-    Write-Info "Installing jv to $installDir..."
+# Install jv.exe (XDG-compliant)
+function Install-JV($binPath, $binDir) {
+    Write-Info "Installing jv to $binDir..."
 
-    if (-not (Test-Path $installDir)) {
-        New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+    # Create ~/.local/bin directory if it doesn't exist
+    if (-not (Test-Path $binDir)) {
+        New-Item -ItemType Directory -Path $binDir -Force | Out-Null
     }
 
-    $targetPath = Join-Path $installDir "jv.exe"
+    # Install jv.exe directly in ~/.local/bin/
+    $targetPath = Join-Path $binDir "jv.exe"
     Copy-Item -Path $binPath -Destination $targetPath -Force
 
     Write-Success "Installed jv.exe to: $targetPath"
-    return $installDir
+    return $binDir
 }
 
 # Set Java environment variables (JAVA_HOME and PATH)
@@ -495,14 +494,14 @@ function Add-ToPath($directory) {
     Set-ItemProperty -Path $regPath -Name "Path" -Value $newPath
 
     # Broadcast environment change
-    BroadcastEnvironmentChange
+    Broadcast-EnvironmentChange
 
     Write-Success "Added to user PATH"
     return $true
 }
 
 # Broadcast environment variable changes
-function BroadcastEnvironmentChange {
+function Broadcast-EnvironmentChange {
     try {
         $HWND_BROADCAST = [IntPtr]0xffff
         $WM_SETTINGCHANGE = 0x1a
@@ -530,11 +529,17 @@ namespace Win32 {
     }
 }
 
-# Create initial config file
+# Create initial config file (XDG-compliant)
 function Initialize-Config($javaInstallations) {
     Write-Info "Creating configuration..."
 
-    $configPath = Join-Path $HOME "jv.json"
+    # Save config following XDG Base Directory: $HOME/.config/jv/jv.json
+    $configDir = Join-Path $HOME ".config\jv"
+    if (-not (Test-Path $configDir)) {
+        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+    }
+
+    $configPath = Join-Path $configDir "jv.json"
 
     $config = @{
         custom_paths = @($javaInstallations)
@@ -545,6 +550,7 @@ function Initialize-Config($javaInstallations) {
     $configJson | Set-Content -Path $configPath -Encoding UTF8
 
     Write-Success "Configuration created at: $configPath"
+    return $configPath
 }
 
 # Main execution
@@ -613,12 +619,13 @@ try {
         }
     }
 
-    # Install jv.exe
-    $installedDir = Install-JV -binPath $jvPath -installDir $finalInstallDir
+    # Install jv.exe to ~/.local/bin
+    $binDir = Install-JV -binPath $jvPath -binDir $finalInstallDir
 
-    # Update PATH for jv.exe (user level)
+    # Add ~/.local/bin to PATH (user level)
+    $pathModified = $false
     if (-not $NoModifyPath) {
-        $pathModified = Add-ToPath -directory $installedDir
+        $pathModified = Add-ToPath -directory $binDir
     }
 
     # Set Java environment variables if Java was downloaded
@@ -627,8 +634,8 @@ try {
         $javaEnvSet = Set-JavaEnvironment -javaPath $downloadedJava
     }
 
-    # Create config
-    Initialize-Config -javaInstallations $javaInstalls
+    # Create config in ~/.config/jv/
+    $configPath = Initialize-Config -javaInstallations $javaInstalls
 
     # Cleanup
     $tempDir = Join-Path $env:TEMP "jv-install"
@@ -640,7 +647,14 @@ try {
     Write-Host "   Installation Complete!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
-    Write-Success "jv installed to: $installedDir"
+    Write-Success "jv installed to: $binDir\jv.exe"
+    Write-Success "Configuration: $configPath"
+
+    if ($pathModified) {
+        Write-Success "Added $binDir to user PATH"
+    } else {
+        Write-Info "$binDir already in user PATH"
+    }
 
     if ($downloadedJava) {
         Write-Success "Java $JavaVersion installed to: $downloadedJava"
@@ -653,8 +667,18 @@ try {
     }
 
     Write-Host ""
+    Write-Host "Installation Summary:" -ForegroundColor Yellow
+    Write-Host "  Executable: $binDir\jv.exe" -ForegroundColor Cyan
+    Write-Host "  Config:     $configPath" -ForegroundColor Cyan
+    if ($javaEnvSet) {
+        Write-Host "  JAVA_HOME:  $downloadedJava" -ForegroundColor Cyan
+        Write-Host "  PATH:       Includes %JAVA_HOME%\bin" -ForegroundColor Cyan
+    }
+
+    Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "  1. Restart your terminal (or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User'); `$env:JAVA_HOME = [System.Environment]::GetEnvironmentVariable('JAVA_HOME','Machine'))"
+    Write-Host "  1. Restart your terminal to reload environment variables"
+    Write-Host "     (or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User'))"
     Write-Host "  2. Run: jv list"
 
     if ($javaEnvSet) {

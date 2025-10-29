@@ -141,11 +141,19 @@ func (c *Config) HasSearchPath(path string) bool {
 }
 
 // getConfigPath returns the path to the configuration file
+// Following XDG Base Directory specification
 func getConfigPath() string {
+	// Try XDG_CONFIG_HOME first (standard on Unix systems)
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome != "" {
+		return filepath.Join(configHome, "jv", "jv.json")
+	}
+
+	// Fallback to $HOME/.config/jv/jv.json (XDG default)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		homeDir = "."
 	}
 
-	return filepath.Join(homeDir, "jv.json")
+	return filepath.Join(homeDir, ".config", "jv", "jv.json")
 }
