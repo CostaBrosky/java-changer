@@ -53,7 +53,7 @@ jv version
 jv help
 ```
 
-If you see the output, installation succeeded! 🎉
+If you see the output, installation succeeded!
 
 ## Method 2: Build from Source
 
