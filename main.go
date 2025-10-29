@@ -1,0 +1,367 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"java-changer/internal/config"
+	"java-changer/internal/env"
+	"java-changer/internal/java"
+)
+
+// Version is set during build time via ldflags
+var Version = "dev"
+
+func main() {
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[1]
+
+	switch command {
+	case "list":
+		handleList()
+	case "use":
+		handleUse()
+	case "current":
+		handleCurrent()
+	case "add":
+		handleAdd()
+	case "remove":
+		handleRemove()
+	case "add-path":
+		handleAddPath()
+	case "remove-path":
+		handleRemovePath()
+	case "list-paths":
+		handleListPaths()
+	case "version", "-v", "--version":
+		printVersion()
+	case "help", "-h", "--help":
+		printUsage()
+	default:
+		fmt.Printf("Unknown command: %s\n", command)
+		printUsage()
+		os.Exit(1)
+	}
+}
+
+func handleList() {
+	detector := java.NewDetector()
+	versions, err := detector.FindAll()
+	if err != nil {
+		fmt.Printf("Error finding Java versions: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(versions) == 0 {
+		fmt.Println("No Java installations found.")
+		return
+	}
+
+	current := os.Getenv("JAVA_HOME")
+	fmt.Println("Available Java versions:")
+	fmt.Println()
+
+	for _, v := range versions {
+		marker := "  "
+		if strings.EqualFold(v.Path, current) {
+			marker = "* "
+		}
+		source := "auto"
+		if v.IsCustom {
+			source = "custom"
+		}
+		fmt.Printf("%s%-15s %s (%s)\n", marker, v.Version, v.Path, source)
+	}
+}
+
+func handleUse() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: jv use <version>")
+		fmt.Println("Example: jv use 17")
+		os.Exit(1)
+	}
+
+	version := os.Args[2]
+
+	detector := java.NewDetector()
+	versions, err := detector.FindAll()
+	if err != nil {
+		fmt.Printf("Error finding Java versions: %v\n", err)
+		os.Exit(1)
+	}
+
+	var target *java.Version
+	for i, v := range versions {
+		if strings.Contains(v.Version, version) {
+			target = &versions[i]
+			break
+		}
+	}
+
+	if target == nil {
+		fmt.Printf("Java version '%s' not found.\n", version)
+		fmt.Println("Use 'jv list' to see available versions.")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Switching to Java %s...\n", target.Version)
+	fmt.Printf("Path: %s\n", target.Path)
+
+	if err := env.SetJavaHome(target.Path); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		fmt.Println("\nNote: This command requires administrator privileges.")
+		fmt.Println("Please run your terminal as Administrator and try again.")
+		os.Exit(1)
+	}
+
+	fmt.Println("Successfully updated JAVA_HOME!")
+	fmt.Println("\nNote: You may need to restart your terminal or applications for changes to take effect.")
+}
+
+func handleCurrent() {
+	javaHome := os.Getenv("JAVA_HOME")
+	if javaHome == "" {
+		fmt.Println("JAVA_HOME is not set.")
+		return
+	}
+
+	detector := java.NewDetector()
+	version := detector.GetVersion(javaHome)
+
+	fmt.Printf("Current Java version: %s\n", version)
+	fmt.Printf("JAVA_HOME: %s\n", javaHome)
+}
+
+func handleAdd() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: jv add <path>")
+		fmt.Println("Example: jv add C:\\custom\\jdk-21")
+		os.Exit(1)
+	}
+
+	path := os.Args[2]
+
+	detector := java.NewDetector()
+	if !detector.IsValidJavaPath(path) {
+		fmt.Printf("Invalid Java installation path: %s\n", path)
+		fmt.Println("Make sure the path contains bin\\java.exe")
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.HasCustomPath(path) {
+		fmt.Println("This path is already in the custom paths list.")
+		return
+	}
+
+	cfg.AddCustomPath(path)
+	if err := cfg.Save(); err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+		os.Exit(1)
+	}
+
+	version := detector.GetVersion(path)
+	fmt.Printf("Added Java %s to custom paths.\n", version)
+}
+
+func handleRemove() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: jv remove <path>")
+		fmt.Println("Example: jv remove C:\\custom\\jdk-21")
+		os.Exit(1)
+	}
+
+	path := os.Args[2]
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !cfg.HasCustomPath(path) {
+		fmt.Println("This path is not in the custom paths list.")
+		return
+	}
+
+	cfg.RemoveCustomPath(path)
+	if err := cfg.Save(); err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Removed from custom paths.")
+}
+
+func handleAddPath() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: jv add-path <directory>")
+		fmt.Println("Example: jv add-path C:\\DevTools\\Java")
+		fmt.Println()
+		fmt.Println("This adds a directory where the detector will search for Java installations.")
+		os.Exit(1)
+	}
+
+	path := os.Args[2]
+
+	detector := java.NewDetector()
+	if !detector.IsValidSearchPath(path) {
+		fmt.Printf("Invalid directory path: %s\n", path)
+		fmt.Println("Make sure the path exists and is a directory.")
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.HasSearchPath(path) {
+		fmt.Println("This search path is already configured.")
+		return
+	}
+
+	cfg.AddSearchPath(path)
+	if err := cfg.Save(); err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Added search path: %s\n", path)
+	fmt.Println("The detector will now scan this directory for Java installations.")
+	fmt.Println("Run 'jv list' to see detected versions.")
+}
+
+func handleRemovePath() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: jv remove-path <directory>")
+		fmt.Println("Example: jv remove-path C:\\DevTools\\Java")
+		os.Exit(1)
+	}
+
+	path := os.Args[2]
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !cfg.HasSearchPath(path) {
+		fmt.Println("This path is not in the search paths list.")
+		return
+	}
+
+	cfg.RemoveSearchPath(path)
+	if err := cfg.Save(); err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Removed search path.")
+}
+
+func handleListPaths() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	detector := java.NewDetector()
+
+	fmt.Println("Java search paths:")
+	fmt.Println()
+
+	// Show standard paths
+	fmt.Println("Standard paths (built-in):")
+	standardPaths := []string{
+		"C:\\Program Files\\Java",
+		"C:\\Program Files (x86)\\Java",
+		"C:\\Program Files\\Eclipse Adoptium",
+		"C:\\Program Files\\Eclipse Foundation",
+		"C:\\Program Files\\Zulu",
+		"C:\\Program Files\\Amazon Corretto",
+		"C:\\Program Files\\Microsoft",
+	}
+
+	for _, p := range standardPaths {
+		exists := detector.IsValidSearchPath(p)
+		marker := ""
+		if exists {
+			marker = " [exists]"
+		}
+		fmt.Printf("  %s%s\n", p, marker)
+	}
+
+	// Show custom paths
+	if len(cfg.SearchPaths) > 0 {
+		fmt.Println()
+		fmt.Println("Custom search paths:")
+		for _, p := range cfg.SearchPaths {
+			exists := detector.IsValidSearchPath(p)
+			marker := ""
+			if exists {
+				marker = " [exists]"
+			} else {
+				marker = " [not found]"
+			}
+			fmt.Printf("  %s%s\n", p, marker)
+		}
+	} else {
+		fmt.Println()
+		fmt.Println("No custom search paths configured.")
+		fmt.Println("Use 'jv add-path <directory>' to add one.")
+	}
+}
+
+func printVersion() {
+	fmt.Printf("Java Version Switcher (jv) version %s\n", Version)
+	fmt.Println("https://github.com/user/java-changer")
+}
+
+func printUsage() {
+	fmt.Println("Java Version Switcher - Easy Java version management for Windows")
+	fmt.Println()
+	fmt.Println("Usage: jv <command> [arguments]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  Version Management:")
+	fmt.Println("    list              List all available Java versions")
+	fmt.Println("    use <version>     Switch to specified Java version")
+	fmt.Println("    current           Show current Java version")
+	fmt.Println()
+	fmt.Println("  Custom Installations:")
+	fmt.Println("    add <path>        Add a specific Java installation")
+	fmt.Println("    remove <path>     Remove a custom installation")
+	fmt.Println()
+	fmt.Println("  Search Paths:")
+	fmt.Println("    add-path <dir>    Add directory to search for Java installations")
+	fmt.Println("    remove-path <dir> Remove directory from search paths")
+	fmt.Println("    list-paths        Show all search paths (standard + custom)")
+	fmt.Println()
+	fmt.Println("  Other:")
+	fmt.Println("    version           Show version information")
+	fmt.Println("    help              Show this help message")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  jv list")
+	fmt.Println("  jv use 17")
+	fmt.Println("  jv current")
+	fmt.Println("  jv add C:\\custom\\jdk-21")
+	fmt.Println("  jv add-path C:\\DevTools\\Java")
+	fmt.Println("  jv list-paths")
+	fmt.Println()
+	fmt.Println("Note: Switching Java versions requires administrator privileges.")
+}
