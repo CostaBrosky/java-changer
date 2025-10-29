@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/user/java-changer/internal/config"
+	"java-changer/internal/config"
 )
 
 // Detector finds Java installations on the system

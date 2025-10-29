@@ -1,4 +1,4 @@
-module github.com/user/java-changer
+module java-changer
 
 go 1.21
 

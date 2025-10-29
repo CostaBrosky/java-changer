@@ -23,7 +23,9 @@ jobs:
           go-version: '1.21'
 
       - name: Build Windows executable
-        run: go build -ldflags="-s -w" -o jv.exe ./cmd/jv
+        run: |
+          go mod download
+          go build -ldflags="-s -w" -o jv.exe ./cmd/jv/main.go
         env:
           CGO_ENABLED: 0
           GOOS: windows
