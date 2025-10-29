@@ -490,5 +490,7 @@ java-changer/            # CLI entry point
 ---
 
 <div align="center">
+  
 **Made with ❤️ to simplify Java development on Windows**
+
 </div>
