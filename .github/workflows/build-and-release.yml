@@ -1,0 +1,89 @@
+name: Build & Release (Go)
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]        # crea una release quando pushi un tag tipo v1.2.3
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write         # necessario per creare la release
+
+env:
+  APP_NAME: jv
+  # Se è un tag usa il nome del tag come versione, altrimenti "snapshot"
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'snapshot' }}
+
+jobs:
+  build:
+    name: Build Windows binaries
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ amd64, arm64 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Verify deps
+        run: go mod download
+
+      - name: Build (${{ matrix.arch }})
+        env:
+          CGO_ENABLED: 0
+          GOOS: windows
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p dist
+          # Build dell'eseguibile Windows
+          go build -trimpath -ldflags="-s -w" -o "dist/${APP_NAME}-windows-${GOARCH}.exe" ./cmd/jv
+
+      - name: Upload artifact (${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-windows-${{ matrix.arch }}.exe
+          path: dist/${{ env.APP_NAME }}-windows-${{ matrix.arch }}.exe
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.APP_NAME }}-windows-*.exe
+          merge-multiple: true
+          path: dist
+
+      - name: Package zips and checksums
+        run: |
+          cd dist
+          for exe in ${APP_NAME}-windows-*.exe; do
+            base="${exe%.exe}"                     # es: jv-windows-amd64
+            arch="${base##*-}"                     # es: amd64
+            zip "jv_${VERSION}_windows_${arch}.zip" "$exe"
+          done
+          sha256sum *.zip > SHA256SUMS.txt
+          ls -lah
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
