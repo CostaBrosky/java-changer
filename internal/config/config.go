@@ -45,6 +45,12 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// Remove BOM if present (UTF-8 BOM is EF BB BF)
+	// This handles files created by PowerShell with Set-Content -Encoding UTF8
+	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+		data = data[3:]
+	}
+
 	// Parse JSON
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, err
