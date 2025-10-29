@@ -1,4 +1,4 @@
-module java-changer
+module jv
 
 go 1.21
 

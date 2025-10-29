@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"java-changer/internal/config"
-	"java-changer/internal/env"
-	"java-changer/internal/java"
+	"jv/internal/config"
+	"jv/internal/env"
+	"jv/internal/java"
 )
 
 // Version is set during build time via ldflags
@@ -352,7 +352,7 @@ func handleInit() {
 		fmt.Println("No Java installations found.")
 		fmt.Println()
 		fmt.Println("To install Java automatically, run:")
-		fmt.Println("  PowerShell: irm https://raw.githubusercontent.com/USER/java-changer/main/install.ps1 | iex")
+		fmt.Println("  PowerShell: irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex")
 		os.Exit(1)
 	}
 
@@ -378,17 +378,17 @@ func handleInit() {
 		fmt.Println("✗ JAVA_HOME is not set")
 	}
 
-	// Check PATH
-	pathEnv := os.Getenv("PATH")
+	// Check Path
+	pathEnv := os.Getenv("Path")
 	hasJavaInPath := strings.Contains(strings.ToLower(pathEnv), "java")
 	hasJavaHomeInPath := strings.Contains(pathEnv, "%JAVA_HOME%\\bin") || strings.Contains(pathEnv, "%JAVA_HOME%/bin")
 
 	if hasJavaHomeInPath {
-		fmt.Println("✓ %JAVA_HOME%\\bin is in PATH")
+		fmt.Println("✓ %JAVA_HOME%\\bin is in Path")
 	} else if hasJavaInPath {
-		fmt.Println("⚠ PATH contains Java, but not via %JAVA_HOME%\\bin")
+		fmt.Println("⚠ Path contains Java, but not via %JAVA_HOME%\\bin")
 	} else {
-		fmt.Println("✗ No Java found in PATH")
+		fmt.Println("✗ No Java found in Path")
 	}
 	fmt.Println()
 
@@ -457,7 +457,7 @@ func handleInit() {
 
 func printVersion() {
 	fmt.Printf("Java Version Switcher (jv) version %s\n", Version)
-	fmt.Println("https://github.com/user/java-changer")
+	fmt.Println("https://github.com/CostaBrosky/jv")
 }
 
 func printUsage() {

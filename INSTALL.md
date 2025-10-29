@@ -6,7 +6,7 @@ Step-by-step guide to install Java Version Switcher (jv) on Windows.
 
 ### Step 1: Download
 
-1. Open your browser and go to: https://github.com/USERNAME/java-changer/releases
+1. Open your browser and go to: https://github.com/CostaBrosky/jv/releases
 2. Click on the latest release (the top one)
 3. Under "Assets", click **`jv.exe`** to download the executable
 
@@ -66,8 +66,8 @@ If you see the output, installation succeeded!
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/USERNAME/java-changer.git
-   cd java-changer
+   git clone https://github.com/CostaBrosky/jv.git
+   cd jv
    ```
 
 2. **Download dependencies:**

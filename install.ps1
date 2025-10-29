@@ -24,10 +24,10 @@ Don't add to PATH environment variable
 Non-interactive mode, uses all defaults
 
 .EXAMPLE
-irm https://raw.githubusercontent.com/USER/java-changer/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 
 .EXAMPLE
-irm https://raw.githubusercontent.com/USER/java-changer/main/install.ps1 | iex -Args "-JavaVersion", "17"
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-JavaVersion", "17"
 
 .EXAMPLE
 .\install.ps1 -Silent -JavaVersion 21

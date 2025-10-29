@@ -43,19 +43,19 @@ irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 
 ```powershell
 # Install with Java 17
-irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-JavaVersion", "17"
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-JavaVersion", "17"
 
 # Silent installation for CI/CD
-irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "21"
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "21"
 
 # Custom installation directory
-irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-InstallDir", "C:\tools"
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-InstallDir", "C:\tools"
 
 # Skip Java download entirely
-irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-NoJava"
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-NoJava"
 
 # Download script and run locally
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 -OutFile install.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 -OutFile install.ps1
 .\install.ps1 -JavaVersion 17
 ```
 
@@ -291,7 +291,7 @@ Temporary files are cleaned up, but partial PATH modifications may remain.
 - name: Install jv
   shell: powershell
   run: |
-    irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "17"
+    irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "17"
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')
     jv version
 ```
@@ -303,7 +303,7 @@ Temporary files are cleaned up, but partial PATH modifications may remain.
   inputs:
     targetType: 'inline'
     script: |
-      irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-Silent", "-NoJava"
+      irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-Silent", "-NoJava"
 ```
 
 ## Troubleshooting

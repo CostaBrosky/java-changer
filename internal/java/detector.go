@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"java-changer/internal/config"
+	"jv/internal/config"
 )
 
 // Detector finds Java installations on the system
@@ -26,7 +26,6 @@ func NewDetector() *Detector {
 			"C:\\Program Files\\Zulu",
 			"C:\\Program Files\\Amazon Corretto",
 			"C:\\Program Files\\Microsoft",
-			"C:\\DevTools\\Java",
 		},
 	}
 }

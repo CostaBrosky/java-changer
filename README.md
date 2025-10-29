@@ -39,7 +39,7 @@
 
 ### Method 1: Download Executable (Recommended)
 
-1. Download the latest `jv.exe` from the [Releases](https://github.com/USERNAME/java-changer/releases) page
+1. Download the latest `jv.exe` from the [Releases](https://github.com/CostaBrosky/jv/releases) page
 2. Create a dedicated directory for your tools (e.g., `C:\tools\`)
 3. Copy `jv.exe` to that directory
 4. Add the directory to your PATH (see instructions below)
@@ -49,8 +49,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/USERNAME/java-changer.git
-cd java-changer
+git clone https://github.com/CostaBrosky/jv.git
+cd jv
 
 # Download dependencies
 go mod download
@@ -84,7 +84,7 @@ When you download `jv.exe`, **Windows SmartScreen will show a security warning**
 
 #### Step 1: Download the file
 
-1. Download `jv.exe` from the [Releases](https://github.com/USERNAME/java-changer/releases) page
+1. Download `jv.exe` from the [Releases](https://github.com/CostaBrosky/jv/releases) page
 2. Windows SmartScreen may show: **"Windows protected your PC"**
 3. Click **"More info"**
 4. Click **"Run anyway"**
@@ -452,7 +452,7 @@ jv add C:\Program Files\Java\jdk-17\bin
 
 Contributions are welcome! If you have ideas, bug reports, or feature requests:
 
-1. Open an [Issue](https://github.com/USERNAME/java-changer/issues)
+1. Open an [Issue](https://github.com/CostaBrosky/jv/issues)
 2. Fork the project
 3. Create a branch (`git checkout -b feature/amazing-feature`)
 4. Commit your changes (`git commit -m 'Add amazing feature'`)
@@ -470,7 +470,7 @@ This project is released under the MIT License. See the [LICENSE](LICENSE) file 
 ### Project Structure
 
 ```
-java-changer/            # CLI entry point
+jv/            # CLI entry point
 ├── internal/
 │   ├── java/            # Java version detection
 │   ├── config/          # Configuration management

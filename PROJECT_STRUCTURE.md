@@ -5,7 +5,7 @@ Complete overview of the Java Version Switcher project.
 ## Directory Structure
 
 ```
-java-changer/
+jv/
 │
 ├── .github/                          # GitHub configuration
 │   └── workflows/
