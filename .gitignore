@@ -11,6 +11,12 @@
 # Output of the go coverage tool
 *.out
 
+# Research files
+.research/
+
+# Claude files
+.claude/
+
 # Go workspace file
 go.work
 

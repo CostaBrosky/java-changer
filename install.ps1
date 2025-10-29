@@ -77,6 +77,47 @@ function Write-Err($message) {
     Write-Host "[ERROR] $message" -ForegroundColor Red
 }
 
+# Check if running as administrator
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Restart script with elevated privileges
+function Invoke-ElevatedScript {
+    param([string[]]$Arguments)
+
+    Write-Info "Administrator privileges required for system-wide installation"
+    Write-Info "Restarting script with elevated privileges..."
+
+    $scriptPath = $MyInvocation.PSCommandPath
+    if (-not $scriptPath) {
+        $scriptPath = $PSCommandPath
+    }
+
+    try {
+        $argString = ($Arguments | ForEach-Object {
+            if ($_ -match '\s') {
+                "`"$_`""
+            } else {
+                $_
+            }
+        }) -join ' '
+
+        Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $argString" -Verb RunAs -Wait
+        exit 0
+    }
+    catch {
+        Write-Err "Failed to elevate privileges: $_"
+        Write-Host ""
+        Write-Host "Please run this script as Administrator manually:" -ForegroundColor Yellow
+        Write-Host "  Right-click PowerShell -> Run as Administrator" -ForegroundColor Yellow
+        Write-Host "  Then run: .\install.ps1" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 # Initialize environment and validate prerequisites
 function Initialize-Environment {
     Write-Info "Validating environment..."
@@ -111,25 +152,32 @@ function Initialize-Environment {
 
 # Detect Windows architecture
 function Get-WindowsArchitecture {
-    try {
-        $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-        switch ($arch) {
-            "X64" { return "x64" }
-            "X86" { return "x86" }
-            "Arm64" { return "arm64" }
-            default {
-                Write-Warn "Unknown architecture: $arch, defaulting to x64"
+    # Try environment variables first (most reliable and always available)
+    $processorArch = $env:PROCESSOR_ARCHITECTURE
+    $processorArchW6432 = $env:PROCESSOR_ARCHITEW6432
+
+    # Handle WOW64 scenarios (32-bit PowerShell on 64-bit Windows)
+    # PROCESSOR_ARCHITEW6432 exists only when running 32-bit process on 64-bit Windows
+    if ($processorArchW6432) {
+        $processorArch = $processorArchW6432
+    }
+
+    # Map Windows architecture names to expected format
+    switch -Regex ($processorArch) {
+        "AMD64|x64" { return "x64" }
+        "x86|i386|i686" { return "x86" }
+        "ARM64|aarch64" { return "arm64" }
+        "ARM" { return "arm" }
+        default {
+            # Final fallback using .NET
+            if ([Environment]::Is64BitOperatingSystem) {
+                Write-Warn "Could not determine exact architecture from '$processorArch', defaulting to x64"
                 return "x64"
             }
-        }
-    }
-    catch {
-        # Fallback for older PowerShell versions
-        if ([Environment]::Is64BitOperatingSystem) {
-            return "x64"
-        }
-        else {
-            return "x86"
+            else {
+                Write-Warn "Could not determine exact architecture from '$processorArch', defaulting to x86"
+                return "x86"
+            }
         }
     }
 }
@@ -151,7 +199,7 @@ function Get-InstallDirectory {
 }
 
 # Download jv.exe from GitHub releases
-function Download-JV($version, $arch) {
+function DownloadJv($version, $arch) {
     Write-Info "Downloading jv $version for $arch..."
 
     try {
@@ -252,7 +300,7 @@ function Find-JavaInstallations {
 }
 
 # Download Java JDK from Eclipse Adoptium
-function Download-Java($version, $arch) {
+function DownloadJava($version, $arch) {
     Write-Info "Downloading Java $version from Eclipse Adoptium..."
 
     try {
@@ -271,8 +319,9 @@ function Download-Java($version, $arch) {
         $downloadUrl = $binary.package.link
         $checksum = $binary.package.checksum
         $size = [math]::Round($binary.package.size / 1MB, 2)
+        $jdkVersion = $jdkInfo[0].version.openjdk_version
 
-        Write-Info "Found JDK $($jdkInfo[0].version.openjdk_version)"
+        Write-Info "Found JDK $jdkVersion"
         Write-Info "Size: $size MB"
 
         $tempDir = Join-Path $env:TEMP "jv-install"
@@ -290,28 +339,61 @@ function Download-Java($version, $arch) {
         }
         Write-Success "Checksum verified"
 
-        # Extract
-        $javaInstallDir = Join-Path $HOME ".jv"
-        if (-not (Test-Path $javaInstallDir)) {
-            New-Item -ItemType Directory -Path $javaInstallDir | Out-Null
+        # Determine installation directory
+        # Try Program Files first (requires admin), fallback to user directory
+        $isAdmin = Test-Administrator
+        if ($isAdmin) {
+            $javaInstallBase = "C:\Program Files\Eclipse Adoptium"
+        } else {
+            Write-Warn "Not running as administrator, installing to user directory"
+            $javaInstallBase = Join-Path $HOME ".jv"
         }
 
+        if (-not (Test-Path $javaInstallBase)) {
+            New-Item -ItemType Directory -Path $javaInstallBase -Force | Out-Null
+        }
+
+        # Extract to temp location first
         Write-Info "Extracting JDK..."
-        Expand-Archive -Path $zipPath -DestinationPath $javaInstallDir -Force
+        $tempExtractDir = Join-Path $tempDir "extract"
+        if (Test-Path $tempExtractDir) {
+            Remove-Item -Path $tempExtractDir -Recurse -Force
+        }
+        Expand-Archive -Path $zipPath -DestinationPath $tempExtractDir -Force
 
         # Find the extracted directory
-        $extractedDirs = Get-ChildItem -Path $javaInstallDir -Directory | Where-Object { $_.Name -match "jdk" }
+        $extractedDirs = Get-ChildItem -Path $tempExtractDir -Directory | Where-Object { $_.Name -match "jdk" }
         if ($extractedDirs.Count -eq 0) {
             throw "Failed to find extracted JDK directory"
         }
 
-        $jdkPath = $extractedDirs[0].FullName
+        $extractedJdkPath = $extractedDirs[0].FullName
+
+        # Verify bin\java.exe exists
+        $javaExe = Join-Path $extractedJdkPath "bin\java.exe"
+        if (-not (Test-Path $javaExe)) {
+            throw "Invalid JDK structure: bin\java.exe not found in $extractedJdkPath"
+        }
+
+        # Create a clean directory name: jdk-<version>
+        $cleanDirName = "jdk-$version"
+        $finalJdkPath = Join-Path $javaInstallBase $cleanDirName
+
+        # Remove old installation if exists
+        if (Test-Path $finalJdkPath) {
+            Write-Info "Removing existing installation at $finalJdkPath"
+            Remove-Item -Path $finalJdkPath -Recurse -Force
+        }
+
+        # Move to final location
+        Move-Item -Path $extractedJdkPath -Destination $finalJdkPath -Force
 
         # Cleanup
         Remove-Item $zipPath -ErrorAction SilentlyContinue
+        Remove-Item $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
 
-        Write-Success "Java $version installed to: $jdkPath"
-        return $jdkPath
+        Write-Success "Java $version installed to: $finalJdkPath"
+        return $finalJdkPath
     }
     catch {
         throw "Failed to download Java: $_"
@@ -333,9 +415,66 @@ function Install-JV($binPath, $installDir) {
     return $installDir
 }
 
+# Set Java environment variables (JAVA_HOME and PATH)
+function Set-JavaEnvironment($javaPath) {
+    Write-Info "Setting up Java environment variables..."
+
+    if (-not (Test-Administrator)) {
+        Write-Warn "Administrator privileges required to set system environment variables"
+        Write-Warn "JAVA_HOME will not be set automatically. You can set it manually or run 'jv use <version>' as administrator"
+        return $false
+    }
+
+    try {
+        # Verify Java installation
+        $javaExe = Join-Path $javaPath "bin\java.exe"
+        if (-not (Test-Path $javaExe)) {
+            Write-Warn "Java executable not found at $javaExe, skipping environment setup"
+            return $false
+        }
+
+        # Set JAVA_HOME at system level
+        $regPath = "HKLM:\System\CurrentControlSet\Control\Session Manager\Environment"
+
+        Write-Info "Setting JAVA_HOME to: $javaPath"
+        Set-ItemProperty -Path $regPath -Name "JAVA_HOME" -Value $javaPath -ErrorAction Stop
+
+        # Update system PATH
+        $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+        $paths = $currentPath -split ";" | Where-Object { $_ -ne "" }
+
+        # Remove old Java paths
+        $filteredPaths = $paths | Where-Object {
+            $_ -notmatch "java" -and
+            $_ -notmatch "jdk" -and
+            $_ -notmatch "jre" -and
+            $_ -ne "%JAVA_HOME%\bin"
+        }
+
+        # Add %JAVA_HOME%\bin at the beginning
+        $newPaths = @("%JAVA_HOME%\bin") + $filteredPaths
+        $newPath = $newPaths -join ";"
+
+        Write-Info "Adding %JAVA_HOME%\bin to system PATH"
+        Set-ItemProperty -Path $regPath -Name "Path" -Value $newPath -ErrorAction Stop
+
+        # Broadcast environment change
+        BroadcastEnvironmentChange
+
+        Write-Success "Java environment variables set successfully"
+        Write-Success "JAVA_HOME = $javaPath"
+        Write-Success "Added %JAVA_HOME%\bin to system PATH"
+        return $true
+    }
+    catch {
+        Write-Err "Failed to set Java environment variables: $_"
+        return $false
+    }
+}
+
 # Add directory to user PATH
 function Add-ToPath($directory) {
-    Write-Info "Updating PATH..."
+    Write-Info "Adding $directory to user PATH..."
 
     $regPath = "HKCU:\Environment"
     $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -346,7 +485,7 @@ function Add-ToPath($directory) {
 
     foreach ($p in $paths) {
         if ($p.TrimEnd('\') -eq $normalizedDir) {
-            Write-Info "Directory already in PATH"
+            Write-Info "Directory already in user PATH"
             return $false
         }
     }
@@ -356,37 +495,46 @@ function Add-ToPath($directory) {
     Set-ItemProperty -Path $regPath -Name "Path" -Value $newPath
 
     # Broadcast environment change
+    BroadcastEnvironmentChange
+
+    Write-Success "Added to user PATH"
+    return $true
+}
+
+# Broadcast environment variable changes
+function BroadcastEnvironmentChange {
     try {
         $HWND_BROADCAST = [IntPtr]0xffff
         $WM_SETTINGCHANGE = 0x1a
         $result = [UIntPtr]::Zero
 
-        Add-Type -TypeDefinition @"
+        if (-not ([System.Management.Automation.PSTypeName]'Win32.Environment').Type) {
+            Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
-public class Win32 {
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    public static extern IntPtr SendMessageTimeout(
-        IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam,
-        uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+namespace Win32 {
+    public class Environment {
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam,
+            uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+    }
 }
 "@
+        }
 
-        [Win32]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$result) | Out-Null
+        [Win32.Environment]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$result) | Out-Null
     }
     catch {
         Write-Warn "Failed to broadcast environment change: $_"
     }
-
-    Write-Success "Added to PATH"
-    return $true
 }
 
 # Create initial config file
 function Initialize-Config($javaInstallations) {
     Write-Info "Creating configuration..."
 
-    $configPath = Join-Path $HOME ".javarc"
+    $configPath = Join-Path $HOME "jv.json"
 
     $config = @{
         custom_paths = @($javaInstallations)
@@ -407,6 +555,34 @@ try {
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
 
+    # Check for admin privileges and offer to elevate
+    $isAdmin = Test-Administrator
+    if (-not $isAdmin -and -not $Silent) {
+        Write-Host ""
+        Write-Warn "Not running as Administrator"
+        Write-Host ""
+        Write-Host "Administrator privileges are recommended for:" -ForegroundColor Yellow
+        Write-Host "  - Installing Java to Program Files" -ForegroundColor Yellow
+        Write-Host "  - Setting JAVA_HOME system variable" -ForegroundColor Yellow
+        Write-Host "  - Adding Java to system PATH" -ForegroundColor Yellow
+        Write-Host ""
+        $response = Read-Host "Would you like to restart with administrator privileges? (Y/n)"
+
+        if ($response -eq "" -or $response -eq "y" -or $response -eq "Y") {
+            # Build argument list
+            $scriptArgs = @()
+            if ($Version -ne "latest") { $scriptArgs += "-Version", $Version }
+            if ($JavaVersion -ne "21") { $scriptArgs += "-JavaVersion", $JavaVersion }
+            if ($InstallDir) { $scriptArgs += "-InstallDir", $InstallDir }
+            if ($NoJava) { $scriptArgs += "-NoJava" }
+            if ($NoModifyPath) { $scriptArgs += "-NoModifyPath" }
+
+            Invoke-ElevatedScript -Arguments $scriptArgs
+        }
+
+        Write-Info "Continuing with limited installation (user-level only)..."
+    }
+
     Initialize-Environment
 
     $arch = Get-WindowsArchitecture
@@ -416,7 +592,7 @@ try {
     Write-Info "Install directory: $finalInstallDir"
 
     # Download jv.exe
-    $jvPath = Download-JV -version $Version -arch $arch
+    $jvPath = DownloadJv -version $Version -arch $arch
 
     # Check for Java installations
     $javaInstalls = Find-JavaInstallations
@@ -432,7 +608,7 @@ try {
         }
 
         if ($downloadJava) {
-            $downloadedJava = Download-Java -version $JavaVersion -arch $arch
+            $downloadedJava = DownloadJava -version $JavaVersion -arch $arch
             $javaInstalls += $downloadedJava
         }
     }
@@ -440,9 +616,15 @@ try {
     # Install jv.exe
     $installedDir = Install-JV -binPath $jvPath -installDir $finalInstallDir
 
-    # Update PATH
+    # Update PATH for jv.exe (user level)
     if (-not $NoModifyPath) {
         $pathModified = Add-ToPath -directory $installedDir
+    }
+
+    # Set Java environment variables if Java was downloaded
+    $javaEnvSet = $false
+    if ($downloadedJava) {
+        $javaEnvSet = Set-JavaEnvironment -javaPath $downloadedJava
     }
 
     # Create config
@@ -462,13 +644,25 @@ try {
 
     if ($downloadedJava) {
         Write-Success "Java $JavaVersion installed to: $downloadedJava"
+
+        if ($javaEnvSet) {
+            Write-Success "JAVA_HOME and system PATH configured"
+        } else {
+            Write-Warn "JAVA_HOME not set (requires administrator privileges)"
+        }
     }
 
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "  1. Restart your terminal (or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User'))"
+    Write-Host "  1. Restart your terminal (or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User'); `$env:JAVA_HOME = [System.Environment]::GetEnvironmentVariable('JAVA_HOME','Machine'))"
     Write-Host "  2. Run: jv list"
-    Write-Host "  3. Switch Java version: jv use 17  (requires administrator)" -ForegroundColor Cyan
+
+    if ($javaEnvSet) {
+        Write-Host "  3. Java is ready to use! (JAVA_HOME already configured)" -ForegroundColor Green
+    } else {
+        Write-Host "  3. Switch Java version: jv use $JavaVersion  (requires administrator)" -ForegroundColor Cyan
+    }
+
     Write-Host ""
     Write-Host "For help: jv help" -ForegroundColor Gray
     Write-Host ""

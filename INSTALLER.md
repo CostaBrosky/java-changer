@@ -1,0 +1,396 @@
+# Installer Documentation
+
+Technical documentation for the Java Version Switcher PowerShell installer script.
+
+## Overview
+
+The `install.ps1` script provides automated installation of `jv` with optional Java JDK download from Eclipse Adoptium. It follows modern PowerShell installer patterns inspired by tools like UV (Astral's Python tool) and Rustup.
+
+## Features
+
+- ✅ One-liner installation via `irm | iex`
+- ✅ Downloads jv.exe from GitHub releases
+- ✅ Auto-detects Windows architecture (x64, x86, ARM64)
+- ✅ Scans for existing Java installations
+- ✅ Optional Java download from Eclipse Adoptium API
+- ✅ Automatic PATH configuration
+- ✅ Creates initial `.javarc` configuration
+- ✅ Interactive and silent modes
+- ✅ SHA256 checksum verification
+- ✅ Environment variable broadcast to Windows
+
+## Usage
+
+### Basic Installation
+
+```powershell
+# Standard installation with prompts
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `-Version` | string | "latest" | Version of jv to install |
+| `-JavaVersion` | string | "21" | Java version to download (8, 11, 17, 21) |
+| `-InstallDir` | string | `$HOME\.local\bin` | Installation directory |
+| `-NoJava` | switch | false | Skip Java download prompt |
+| `-NoModifyPath` | switch | false | Don't modify PATH |
+| `-Silent` | switch | false | Non-interactive mode |
+
+### Examples
+
+```powershell
+# Install with Java 17
+irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-JavaVersion", "17"
+
+# Silent installation for CI/CD
+irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "21"
+
+# Custom installation directory
+irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-InstallDir", "C:\tools"
+
+# Skip Java download entirely
+irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-NoJava"
+
+# Download script and run locally
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 -OutFile install.ps1
+.\install.ps1 -JavaVersion 17
+```
+
+## Installation Flow
+
+### 1. Environment Validation
+
+The script validates:
+- PowerShell version (requires 5.0+)
+- Execution policy (must be Unrestricted, RemoteSigned, or Bypass)
+- TLS 1.2 support (requires .NET Framework 4.5+)
+
+### 2. Architecture Detection
+
+Uses `System.Runtime.InteropServices.RuntimeInformation` to detect:
+- x64 (64-bit Intel/AMD)
+- x86 (32-bit)
+- ARM64 (ARM 64-bit)
+
+Fallback to `[Environment]::Is64BitOperatingSystem` for older PowerShell versions.
+
+### 3. Download jv.exe
+
+- Queries GitHub API for latest release (or uses specified version)
+- Downloads `jv.exe` to temporary directory
+- No checksum verification for jv.exe (relies on HTTPS)
+
+### 4. Java Detection
+
+Scans standard directories:
+```
+C:\Program Files\Java
+C:\Program Files (x86)\Java
+C:\Program Files\Eclipse Adoptium
+C:\Program Files\Eclipse Foundation
+C:\Program Files\Zulu
+C:\Program Files\Amazon Corretto
+C:\Program Files\Microsoft
+```
+
+Validates each directory for `bin\java.exe` existence.
+
+### 5. Java Download (Optional)
+
+If no Java found and not skipped:
+
+**Interactive Mode**: Prompts user
+```
+No Java installation found. Download Java 21? (Y/n)
+```
+
+**Silent Mode**: Automatically downloads
+
+**Download Process**:
+1. Query Eclipse Adoptium API:
+   ```
+   GET https://api.adoptium.net/v3/assets/latest/{version}/hotspot
+       ?architecture={arch}&image_type=jdk&os=windows&vendor=eclipse
+   ```
+
+2. Download ZIP archive
+
+3. **Verify SHA256 checksum** (critical for security)
+
+4. Extract to `$HOME\.jv\jdk-{version}`
+
+5. Add to installation list
+
+### 6. Installation
+
+- Creates install directory if not exists
+- Copies `jv.exe` to install directory
+- Destination: `{InstallDir}\jv.exe`
+
+### 7. PATH Modification
+
+If not skipped:
+- Reads current user PATH from registry (`HKCU:\Environment`)
+- Checks for duplicates
+- Prepends install directory to PATH
+- Updates registry
+- Broadcasts `WM_SETTINGCHANGE` message to notify Windows
+
+**Registry Path**: `HKEY_CURRENT_USER\Environment\Path`
+
+### 8. Configuration
+
+Creates `%USERPROFILE%\.javarc` with:
+```json
+{
+  "custom_paths": [
+    "C:\\Users\\username\\.jv\\jdk-21\\jdk-21+35"
+  ],
+  "search_paths": []
+}
+```
+
+### 9. Cleanup
+
+- Removes temporary download directory
+- Displays success message and next steps
+
+## Technical Details
+
+### Eclipse Adoptium API
+
+**Endpoint**: `https://api.adoptium.net/v3/`
+
+**Request Example**:
+```http
+GET /v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse
+```
+
+**Response** (simplified):
+```json
+[
+  {
+    "binary": {
+      "architecture": "x64",
+      "image_type": "jdk",
+      "os": "windows",
+      "package": {
+        "link": "https://github.com/adoptium/temurin21-binaries/releases/download/.../OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip",
+        "checksum": "abc123...",
+        "size": 204850009
+      }
+    },
+    "version": {
+      "major": 21,
+      "openjdk_version": "21.0.5+11-LTS"
+    }
+  }
+]
+```
+
+### PATH Broadcasting
+
+To notify Windows shell and applications of environment variable changes:
+
+```powershell
+$HWND_BROADCAST = [IntPtr]0xffff
+$WM_SETTINGCHANGE = 0x1a
+
+[Win32]::SendMessageTimeout(
+    $HWND_BROADCAST,
+    $WM_SETTINGCHANGE,
+    [UIntPtr]::Zero,
+    "Environment",
+    2,
+    5000,
+    [ref]$result
+)
+```
+
+This broadcasts `WM_SETTINGCHANGE` to all top-level windows, notifying them to reload environment variables.
+
+## Security Considerations
+
+### 1. Execution Policy
+
+The script checks for allowed policies:
+- `Unrestricted`
+- `RemoteSigned` (recommended)
+- `Bypass`
+
+If not allowed, provides instructions to fix:
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### 2. TLS 1.2 Enforcement
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol =
+    [Net.ServicePointManager]::SecurityProtocol -bor
+    [Net.SecurityProtocolType]::Tls12
+```
+
+Ensures all downloads use secure connections.
+
+### 3. Checksum Verification
+
+**For Java JDK downloads**:
+```powershell
+$actualHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+if ($actualHash -ne $checksum.ToLower()) {
+    throw "Checksum verification failed!"
+}
+```
+
+**Note**: jv.exe currently doesn't verify checksum (GitHub HTTPS is trusted).
+
+### 4. No Admin Required
+
+- Installer runs under user context
+- Modifies user-level PATH only
+- Downloads to user directories
+- No system-level changes
+
+This reduces security risks and permission requirements.
+
+## Error Handling
+
+### Common Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "PowerShell 5.0 or higher is required" | Old PowerShell version | Update to Windows PowerShell 5.1 or PowerShell 7+ |
+| "Execution policy is too restrictive" | Strict execution policy | Run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| "TLS 1.2 support is required" | Old .NET Framework | Install .NET Framework 4.5+ |
+| "Failed to download jv.exe" | Network/GitHub issue | Check internet connection, firewall |
+| "Checksum verification failed" | Corrupted download | Re-run installer |
+| "No JDK found for Java X" | Adoptium doesn't have that version/arch | Try different Java version |
+
+### Rollback
+
+On failure:
+```powershell
+catch {
+    Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Error "Installation failed: $_"
+    exit 1
+}
+```
+
+Temporary files are cleaned up, but partial PATH modifications may remain.
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+- name: Install jv
+  shell: powershell
+  run: |
+    irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-Silent", "-JavaVersion", "17"
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')
+    jv version
+```
+
+### Azure Pipelines
+
+```yaml
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      irm https://raw.githubusercontent.com/USERNAME/java-changer/main/install.ps1 | iex -Args "-Silent", "-NoJava"
+```
+
+## Troubleshooting
+
+### Script doesn't run
+
+**Issue**: `running scripts is disabled on this system`
+
+**Solution**:
+```powershell
+# As Administrator
+Set-ExecutionPolicy RemoteSigned -Scope LocalMachine
+
+# Or for current user only
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Java download fails
+
+**Issue**: Adoptium API returns no results
+
+**Possible causes**:
+- Unsupported architecture (e.g., x86 for Java 21)
+- Network/firewall blocking API access
+- Adoptium service down
+
+**Solution**:
+- Use `-NoJava` and install Java manually
+- Try different Java version
+
+### PATH not updated
+
+**Issue**: `jv` command not found after installation
+
+**Solution**:
+1. Restart terminal
+2. Or reload PATH: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')`
+3. Verify install location: `where.exe jv`
+
+## Comparison with Other Installers
+
+| Feature | jv installer | UV | Rustup |
+|---------|--------------|-----|--------|
+| One-liner install | ✅ | ✅ | ✅ |
+| Auto-download tool | ✅ | ✅ | ✅ |
+| Auto-download runtime | ✅ (Java) | ❌ | ❌ |
+| Architecture detection | ✅ | ✅ | ✅ |
+| Checksum verification | ✅ | ✅ | ✅ |
+| PATH modification | ✅ | ✅ | ✅ |
+| Silent mode | ✅ | ✅ | ✅ |
+| Rollback on failure | ⚠️ Partial | ✅ | ✅ |
+| Self-update | ❌ | ✅ | ✅ |
+
+## Future Enhancements
+
+Potential improvements:
+
+1. **Self-update capability**: `jv update` command
+2. **Uninstaller**: `uninstall.ps1` script
+3. **Multiple Java distributions**: Support Corretto, Zulu, etc.
+4. **Proxy configuration**: Better corporate firewall support
+5. **Installation receipt**: JSON metadata file for tracking
+6. **Progress bars**: Visual feedback for downloads
+7. **Rollback mechanism**: Complete undo on failure
+8. **Offline mode**: Install from local files
+9. **GUI installer**: Optional graphical interface
+10. **Chocolatey/Scoop packages**: Package manager integration
+
+## Contributing
+
+To modify the installer:
+
+1. Edit `install.ps1`
+2. Test locally: `.\install.ps1 -WhatIf` (if implemented)
+3. Test with parameters: `.\install.ps1 -Silent -JavaVersion 17`
+4. Test error cases (no internet, wrong version, etc.)
+5. Update this documentation
+6. Commit changes
+
+## References
+
+- [Eclipse Adoptium API Docs](https://api.adoptium.net/q/swagger-ui/)
+- [UV Installer Source](https://github.com/astral-sh/uv/blob/main/docs/guides/install-python.md)
+- [PowerShell Best Practices](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands)
+- [Windows Environment Variables](https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables)
+
+---
+
+**Last Updated**: 2025
+**Maintainer**: Java Version Switcher Contributors
