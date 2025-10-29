@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `C:\Program Files\Zulu`
   - `C:\Program Files\Amazon Corretto`
   - `C:\Program Files\Microsoft`
+  - `C:\DevTools\Java`
 - Custom search paths support via `add-path` command
 - Permanent system environment variable modification (JAVA_HOME and PATH)
 - Commands:
@@ -34,8 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `jv help` - Show help message
 - Persistent configuration in `%USERPROFILE%\.javarc`
 - Windows Registry integration for system-wide changes
-- GitHub Actions CI/CD pipeline for automated releases
-- Comprehensive documentation (README, QUICKSTART, RELEASE guides)
+- Comprehensive documentation (README, QUICKSTART, INSTALL guides)
 
 ### Features
 - Single executable with no external dependencies

@@ -1,197 +1,190 @@
-# Guida di Installazione
+# Installation Guide
 
-Guida passo-passo per installare Java Version Switcher (jv) su Windows.
+Step-by-step guide to install Java Version Switcher (jv) on Windows.
 
-## Metodo 1: Download da GitHub Releases (Consigliato)
+## Method 1: Download from GitHub Releases (Recommended)
 
-### Passo 1: Download
+### Step 1: Download
 
-1. Apri il browser e vai su: https://github.com/USERNAME/java-changer/releases
-2. Clicca sull'ultima release (quella in alto)
-3. Sotto "Assets", clicca su **`jv.exe`** per scaricare l'eseguibile
+1. Open your browser and go to: https://github.com/USERNAME/java-changer/releases
+2. Click on the latest release (the top one)
+3. Under "Assets", click **`jv.exe`** to download the executable
 
-### Passo 2: Verifica (Opzionale ma Consigliato)
+### Step 2: Verify (Optional but Recommended)
 
-Verifica che il file scaricato sia autentico usando SHA256:
+Verify that the downloaded file is authentic using SHA256:
 
 ```powershell
-# In PowerShell, vai nella cartella Downloads
+# In PowerShell, go to the Downloads folder
 cd ~\Downloads
 
-# Calcola il checksum
+# Calculate the checksum
 Get-FileHash jv.exe -Algorithm SHA256
 
-# Confronta l'output con il checksum in checksums.txt nella release
+# Compare the output with the checksum in checksums.txt from the release
 ```
 
-### Passo 3: Installazione
+### Step 3: Installation
 
-**Opzione A - System-wide (Consigliato):**
+**Create a dedicated directory for your tools:**
 
-1. Apri File Explorer come Amministratore
-2. Copia `jv.exe` in `C:\Windows\System32\`
-3. Fatto! Ora puoi usare `jv` da qualsiasi terminale
-
-**Opzione B - Directory Custom:**
-
-1. Crea una directory per i tuoi tool, per esempio:
+1. Create a directory for your tools:
    ```cmd
    mkdir C:\tools
    ```
 
-2. Copia `jv.exe` in `C:\tools\`
+2. Copy `jv.exe` to `C:\tools\`
 
-3. Aggiungi `C:\tools` al PATH:
-   - Premi `Win + X` → Seleziona "Sistema"
-   - Click su "Impostazioni di sistema avanzate"
-   - Click su "Variabili d'ambiente"
-   - Sotto "Variabili di sistema", seleziona "Path" e click "Modifica"
-   - Click "Nuovo" e aggiungi: `C:\tools`
-   - Click "OK" su tutte le finestre
-   - **Riavvia il terminale** per applicare le modifiche
+3. Add `C:\tools` to PATH:
+   - Press `Win + X` → Select "System"
+   - Click "Advanced system settings"
+   - Click "Environment Variables"
+   - Under "User variables" (or "System variables"), select "Path" and click "Edit"
+   - Click "New" and add: `C:\tools`
+   - Click OK on all windows
+   - **Restart the terminal** to apply changes
 
-### Passo 4: Verifica Installazione
+### Step 4: Verify Installation
 
-Apri un nuovo terminale (CMD o PowerShell) e prova:
+Open a new terminal (CMD or PowerShell) and try:
 
 ```cmd
 jv version
 jv help
 ```
 
-Se vedi l'output, l'installazione è riuscita! 🎉
+If you see the output, installation succeeded! 🎉
 
-## Metodo 2: Compilazione da Sorgente
+## Method 2: Build from Source
 
-### Prerequisiti
+### Prerequisites
 
-- Go 1.21 o superiore installato ([Download](https://go.dev/dl/))
-- Git installato ([Download](https://git-scm.com/download/win))
+- Go 1.21 or higher installed ([Download](https://go.dev/dl/))
+- Git installed ([Download](https://git-scm.com/download/win))
 
-### Passi
+### Steps
 
-1. **Clone del repository:**
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/USERNAME/java-changer.git
    cd java-changer
    ```
 
-2. **Download dipendenze:**
+2. **Download dependencies:**
    ```bash
    go mod download
    ```
 
-3. **Compila:**
+3. **Build:**
    ```bash
    go build -ldflags="-s -w" -o jv.exe ./cmd/jv
    ```
 
-4. **Verifica:**
+4. **Verify:**
    ```bash
    .\jv.exe version
    ```
 
-5. **Installa** (copia in una directory nel PATH, vedi Metodo 1, Passo 3)
+5. **Install** (copy to a directory in PATH, see Method 1, Step 3)
 
-## Utilizzo Base
+## Basic Usage
 
-Dopo l'installazione, ecco i comandi base:
+After installation, here are the basic commands:
 
 ```bash
-# Lista versioni Java disponibili
+# List available Java versions
 jv list
 
-# Cambia a Java 17 (ESEGUI TERMINALE COME AMMINISTRATORE!)
+# Switch to Java 17 (RUN TERMINAL AS ADMINISTRATOR!)
 jv use 17
 
-# Mostra versione corrente
+# Show current version
 jv current
 
-# Aggiungi directory custom da scansionare
+# Add custom directory to scan
 jv add-path C:\DevTools\Java
 ```
 
-**IMPORTANTE:** Il comando `jv use` richiede privilegi amministratore perché modifica le variabili d'ambiente di sistema.
+**IMPORTANT:** The `jv use` command requires administrator privileges because it modifies system environment variables.
 
-## Come Eseguire come Amministratore
+## How to Run as Administrator
 
 ### CMD/PowerShell
-1. Cerca "cmd" o "PowerShell" nel menu Start
-2. **Click destro** → "Esegui come amministratore"
-3. Esegui i comandi `jv`
+1. Search for "cmd" or "PowerShell" in Start menu
+2. **Right-click** → "Run as administrator"
+3. Run `jv` commands
 
 ### Windows Terminal
-1. Apri Windows Terminal
-2. Click sulla freccia ▼ vicino al tab
-3. Tieni premuto `Ctrl` e click sul profilo (CMD o PowerShell)
-4. Si aprirà con privilegi amministratore
+1. Open Windows Terminal
+2. Click the dropdown arrow ▼ next to the tab
+3. Hold `Ctrl` and click on the profile (CMD or PowerShell)
+4. It will open with administrator privileges
 
 ## Troubleshooting
 
-### "jv non è riconosciuto come comando interno o esterno"
+### "jv is not recognized as an internal or external command"
 
-**Soluzione:**
-- Assicurati di aver aggiunto `jv.exe` al PATH
-- Riavvia il terminale dopo aver modificato il PATH
-- Verifica con: `where jv` (dovrebbe mostrare il path a jv.exe)
+**Solution:**
+- Make sure you added `jv.exe` to PATH
+- Restart the terminal after modifying PATH
+- Verify with: `where jv` (should show the path to jv.exe)
 
 ### "failed to open registry key (run as administrator)"
 
-**Soluzione:**
-- Il comando `jv use` richiede privilegi amministratore
-- Esegui il terminale come amministratore (vedi sopra)
+**Solution:**
+- The `jv use` command requires administrator privileges
+- Run the terminal as administrator (see above)
 
 ### "No Java installations found"
 
-**Soluzione:**
-- Verifica che Java sia installato sul tuo sistema
-- Se Java è in una directory non standard, aggiungila:
+**Solution:**
+- Verify that Java is installed on your system
+- If Java is in a non-standard directory, add it:
   ```bash
   jv add C:\path\to\jdk
-  # oppure
+  # or
   jv add-path C:\path\to\java-directory
   ```
 
-### Windows Defender blocca l'eseguibile
+### Windows Defender blocks the executable
 
-**Soluzione:**
-- Questo può succedere con eseguibili scaricati da internet
-- Verifica il checksum SHA256 per assicurarti che sia autentico
-- Aggiungi un'eccezione in Windows Defender se necessario
-- In alternativa, compila da sorgente (Metodo 2)
+**Solution:**
+- This can happen with executables downloaded from the internet
+- Verify the SHA256 checksum to ensure it's authentic
+- Add an exception in Windows Defender if necessary
+- Alternatively, build from source (Method 2)
 
-### Le modifiche alle variabili d'ambiente non si applicano
+### Environment variable changes don't apply
 
-**Soluzione:**
-- Dopo aver eseguito `jv use`, riavvia:
-  - Il terminale corrente (chiudi e riapri)
-  - Le applicazioni che devono usare Java (es: IDE)
-- In casi estremi, riavvia Windows
+**Solution:**
+- After running `jv use`, restart:
+  - The current terminal (close and reopen)
+  - Applications that need to use Java (e.g., IDEs)
+- In extreme cases, restart Windows
 
-## Disinstallazione
+## Uninstallation
 
-Per rimuovere jv:
+To remove jv:
 
-1. Elimina `jv.exe` da dove l'hai installato:
+1. Delete `jv.exe` from where you installed it:
    ```cmd
-   # Se installato in System32
-   del C:\Windows\System32\jv.exe
-
-   # Se installato in directory custom
+   # If installed in tools directory
    del C:\tools\jv.exe
    ```
 
-2. (Opzionale) Rimuovi la configurazione:
+2. (Optional) Remove the configuration:
    ```cmd
    del %USERPROFILE%\.javarc
    ```
 
-## Prossimi Passi
+3. (Optional) Remove `C:\tools` from PATH if you're not using it for other tools
 
-Una volta installato, leggi la [Guida Rapida](QUICKSTART.md) per imparare ad usare jv efficacemente.
+## Next Steps
 
-Per documentazione completa, vedi il [README](README.md).
+Once installed, read the [Quick Start Guide](QUICKSTART.md) to learn how to use jv effectively.
+
+For complete documentation, see the [README](README.md).
 
 ---
 
-**Buon switching! ☕**
+**Happy switching! ☕**

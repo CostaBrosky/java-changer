@@ -1,131 +1,131 @@
 # Java Version Switcher (jv)
 
-> Un tool CLI semplice e veloce per cambiare versione di Java su Windows con un singolo comando.
+> A simple and fast CLI tool to switch Java versions on Windows with a single command.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![Windows](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)](https://www.microsoft.com/windows)
 
-## 🚀 Caratteristiche
+## 🚀 Features
 
-- ✅ **Auto-rilevamento** automatico delle installazioni Java
-- ✅ **Switch permanente** modifica le variabili d'ambiente di sistema (JAVA_HOME e PATH)
-- ✅ **Search paths personalizzati** per directory custom
-- ✅ **Configurazione persistente** salvata automaticamente
-- ✅ **Nessuna dipendenza** eseguibile standalone
-- ✅ **Supporto per tutte le distribuzioni** Oracle JDK, OpenJDK, Adoptium, Zulu, Corretto, Microsoft
+- ✅ **Auto-detection** of Java installations
+- ✅ **Permanent switching** modifies system environment variables (JAVA_HOME and PATH)
+- ✅ **Custom search paths** for non-standard directories
+- ✅ **Persistent configuration** saved automatically
+- ✅ **Zero dependencies** standalone executable
+- ✅ **All distributions supported** Oracle JDK, OpenJDK, Adoptium, Zulu, Corretto, Microsoft
 
-## 📋 Indice
+## 📋 Table of Contents
 
-- [Prerequisiti](#-prerequisiti)
-- [Installazione](#-installazione)
-- [Utilizzo Rapido](#-utilizzo-rapido)
-- [Comandi](#-comandi)
-- [Esempi](#-esempi)
-- [Come Funziona](#-come-funziona)
-- [Configurazione](#-configurazione)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Commands](#-commands)
+- [Examples](#-examples)
+- [How It Works](#-how-it-works)
+- [Configuration](#-configuration)
 - [FAQ](#-faq)
 - [Troubleshooting](#-troubleshooting)
-- [Contribuire](#-contribuire)
-- [Licenza](#-licenza)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-## 🔧 Prerequisiti
+## 🔧 Prerequisites
 
-- **Sistema Operativo**: Windows 10 o Windows 11
-- **Go**: 1.21+ (solo per compilazione da sorgente)
-- **Privilegi**: Amministratore (per modificare variabili d'ambiente di sistema)
+- **Operating System**: Windows 10 or Windows 11
+- **Go**: 1.21+ (only for building from source)
+- **Privileges**: Administrator (to modify system environment variables)
 
-## 📦 Installazione
+## 📦 Installation
 
-### Metodo 1: Download Eseguibile (Consigliato)
+### Method 1: Download Executable (Recommended)
 
-1. Scarica l'ultima versione di `jv.exe` dalla pagina [Releases](https://github.com/USERNAME/java-changer/releases)
-2. Copia `jv.exe` in una directory nel tuo PATH:
-   - **Opzione A**: `C:\Windows\System32\` (richiede privilegi admin)
-   - **Opzione B**: Crea una directory (es: `C:\tools\`) e aggiungila al PATH
-3. Apri un nuovo terminale e verifica: `jv version`
+1. Download the latest `jv.exe` from the [Releases](https://github.com/USERNAME/java-changer/releases) page
+2. Create a dedicated directory for your tools (e.g., `C:\tools\`)
+3. Copy `jv.exe` to that directory
+4. Add the directory to your PATH (see instructions below)
+5. Open a new terminal and verify: `jv version`
 
-### Metodo 2: Compilazione da Sorgente
+### Method 2: Build from Source
 
 ```bash
-# Clone del repository
+# Clone the repository
 git clone https://github.com/USERNAME/java-changer.git
 cd java-changer
 
-# Download dipendenze
+# Download dependencies
 go mod download
 
-# Compila
+# Build
 go build -ldflags="-s -w" -o jv.exe ./cmd/jv
 
-# (Opzionale) Copia nel PATH
-copy jv.exe C:\Windows\System32\
+# Copy to your tools directory
+copy jv.exe C:\tools\
 ```
 
-### Aggiungere al PATH (se necessario)
+### Adding to PATH
 
-1. Premi `Win + X` → Seleziona "Sistema"
-2. Click su "Impostazioni di sistema avanzate"
-3. Click su "Variabili d'ambiente"
-4. Sotto "Variabili di sistema", seleziona "Path" → "Modifica"
-5. Click "Nuovo" e aggiungi il path della directory contenente `jv.exe`
-6. Click "OK" su tutte le finestre
-7. **Riavvia il terminale**
+1. Press `Win + X` → Select "System"
+2. Click "Advanced system settings"
+3. Click "Environment Variables"
+4. Under "User variables" (or "System variables"), select "Path" → "Edit"
+5. Click "New" and add the path to your tools directory (e.g., `C:\tools`)
+6. Click "OK" on all windows
+7. **Restart your terminal**
 
-## ⚡ Utilizzo Rapido
+## ⚡ Quick Start
 
 ```bash
-# 1. Lista tutte le versioni Java disponibili
+# 1. List all available Java versions
 jv list
 
-# 2. Cambia a Java 17 (ESEGUI COME AMMINISTRATORE!)
+# 2. Switch to Java 17 (RUN AS ADMINISTRATOR!)
 jv use 17
 
-# 3. Verifica la versione corrente
+# 3. Verify current version
 jv current
 java -version
 ```
 
-**IMPORTANTE**: Il comando `jv use` richiede privilegi amministratore. Click destro su CMD/PowerShell → "Esegui come amministratore"
+**IMPORTANT**: The `jv use` command requires administrator privileges. Right-click on CMD/PowerShell → "Run as administrator"
 
-## 📚 Comandi
+## 📚 Commands
 
-### Gestione Versioni
+### Version Management
 
-| Comando | Descrizione | Esempio |
+| Command | Description | Example |
 |---------|-------------|---------|
-| `jv list` | Lista tutte le versioni Java disponibili | `jv list` |
-| `jv use <version>` | Cambia alla versione specificata | `jv use 17` |
-| `jv current` | Mostra la versione Java corrente | `jv current` |
+| `jv list` | List all available Java versions | `jv list` |
+| `jv use <version>` | Switch to specified version | `jv use 17` |
+| `jv current` | Show current Java version | `jv current` |
 
-### Installazioni Custom
+### Custom Installations
 
-| Comando | Descrizione | Esempio |
+| Command | Description | Example |
 |---------|-------------|---------|
-| `jv add <path>` | Aggiungi una installazione Java specifica | `jv add C:\custom\jdk-21` |
-| `jv remove <path>` | Rimuovi una installazione custom | `jv remove C:\custom\jdk-21` |
+| `jv add <path>` | Add a specific Java installation | `jv add C:\custom\jdk-21` |
+| `jv remove <path>` | Remove a custom installation | `jv remove C:\custom\jdk-21` |
 
 ### Search Paths
 
-| Comando | Descrizione | Esempio |
+| Command | Description | Example |
 |---------|-------------|---------|
-| `jv add-path <dir>` | Aggiungi directory da scansionare per Java | `jv add-path C:\DevTools\Java` |
-| `jv remove-path <dir>` | Rimuovi una search path | `jv remove-path C:\DevTools\Java` |
-| `jv list-paths` | Mostra tutti i search paths | `jv list-paths` |
+| `jv add-path <dir>` | Add directory to scan for Java installations | `jv add-path C:\DevTools\Java` |
+| `jv remove-path <dir>` | Remove a search path | `jv remove-path C:\DevTools\Java` |
+| `jv list-paths` | Show all search paths | `jv list-paths` |
 
-### Utilità
+### Utilities
 
-| Comando | Descrizione |
+| Command | Description |
 |---------|-------------|
-| `jv version` | Mostra versione di jv |
-| `jv help` | Mostra messaggio di aiuto |
+| `jv version` | Show jv version |
+| `jv help` | Show help message |
 
-## 💡 Esempi
+## 💡 Examples
 
-### Scenario 1: Switch tra versioni standard
+### Scenario 1: Switching between standard versions
 
 ```bash
-# Lista versioni disponibili
+# List available versions
 jv list
 
 # Output:
@@ -135,23 +135,23 @@ jv list
 #   11.0.12         C:\Program Files\Java\jdk-11 (auto)
 #   1.8.0_322       C:\Program Files\Java\jdk1.8.0_322 (auto)
 
-# Cambia a Java 11
+# Switch to Java 11
 jv use 11
 
-# Verifica
+# Verify
 jv current
 java -version
 ```
 
-### Scenario 2: Aggiungere directory custom
+### Scenario 2: Adding a custom directory
 
-Se hai Java in una directory non standard (es: `C:\DevTools\Java\` con multiple versioni):
+If you have Java in a non-standard directory (e.g., `C:\DevTools\Java\` with multiple versions):
 
 ```bash
-# Aggiungi la directory base
+# Add the base directory
 jv add-path C:\DevTools\Java
 
-# Il detector troverà automaticamente tutte le versioni in quella directory
+# The detector will automatically find all versions in that directory
 jv list
 
 # Output:
@@ -162,35 +162,35 @@ jv list
 #   19.0.2          C:\DevTools\Java\jdk-19 (auto)
 ```
 
-### Scenario 3: Aggiungere installazione specifica
+### Scenario 3: Adding a specific installation
 
 ```bash
-# Aggiungi UNA installazione specifica
+# Add ONE specific installation
 jv add D:\Projects\special-jdk-17
 
-# Usa quella versione
+# Use that version
 jv use special
 ```
 
-### Differenza tra `add` e `add-path`
+### Difference between `add` and `add-path`
 
-**`jv add <path>`**: Aggiungi UNA installazione Java specifica
+**`jv add <path>`**: Add ONE specific Java installation
 ```bash
 jv add C:\custom\jdk-17
-# Aggiunge SOLO questa installazione
+# Adds ONLY this installation
 ```
 
-**`jv add-path <directory>`**: Scansiona una directory per TUTTE le installazioni Java
+**`jv add-path <directory>`**: Scan a directory for ALL Java installations
 ```bash
 jv add-path C:\DevTools\Java
-# Se contiene jdk-17, jdk-19, jdk-21, trova tutte e tre
+# If it contains jdk-17, jdk-19, jdk-21, finds all three
 ```
 
-## 🔍 Come Funziona
+## 🔍 How It Works
 
-### 1. Auto-rilevamento
+### 1. Auto-detection
 
-Il tool scansiona automaticamente queste directory standard:
+The tool automatically scans these standard directories:
 
 ```
 C:\Program Files\Java
@@ -203,11 +203,11 @@ C:\Program Files\Microsoft
 C:\DevTools\Java
 ```
 
-Più eventuali search paths custom aggiunti con `jv add-path`.
+Plus any custom search paths added with `jv add-path`.
 
-### 2. Configurazione Persistente
+### 2. Persistent Configuration
 
-La configurazione viene salvata in `%USERPROFILE%\.javarc` (file JSON):
+Configuration is saved in `%USERPROFILE%\.javarc` (JSON file):
 
 ```json
 {
@@ -221,35 +221,35 @@ La configurazione viene salvata in `%USERPROFILE%\.javarc` (file JSON):
 }
 ```
 
-### 3. Modifica Variabili d'Ambiente
+### 3. Environment Variable Modification
 
-Quando esegui `jv use <version>`, il tool:
+When you run `jv use <version>`, the tool:
 
-1. Modifica `JAVA_HOME` nel Registry di sistema
-2. Aggiorna `PATH`:
-   - Rimuove vecchi riferimenti Java (es: vecchio `%JAVA_HOME%\bin`)
-   - Aggiunge `%JAVA_HOME%\bin` all'inizio del PATH
-3. Invia un broadcast `WM_SETTINGCHANGE` per notificare Windows delle modifiche
+1. Modifies `JAVA_HOME` in the system Registry
+2. Updates `PATH`:
+   - Removes old Java references (e.g., old `%JAVA_HOME%\bin`)
+   - Adds `%JAVA_HOME%\bin` at the beginning of PATH
+3. Broadcasts `WM_SETTINGCHANGE` to notify Windows of the changes
 
-**Tecnicamente**:
-- Usa le API Windows Registry (`HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment`)
-- Richiede privilegi amministratore per scrivere nel Registry di sistema
-- Le modifiche sono permanenti e sopravvivono ai riavvii
+**Technical details**:
+- Uses Windows Registry API (`HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment`)
+- Requires administrator privileges to write to system Registry
+- Changes are permanent and survive reboots
 
-### 4. Estrazione Versione
+### 4. Version Detection
 
-Il tool identifica la versione Java in due modi:
+The tool identifies Java versions in two ways:
 
-1. **Esegue `java -version`** e parsifica l'output
-2. **Fallback**: estrae dal nome della directory (es: `jdk-17`, `jdk1.8.0_322`)
+1. **Runs `java -version`** and parses the output
+2. **Fallback**: extracts from directory name (e.g., `jdk-17`, `jdk1.8.0_322`)
 
-## ⚙️ Configurazione
+## ⚙️ Configuration
 
-### File di Configurazione
+### Configuration File
 
-Posizione: `%USERPROFILE%\.javarc`
+Location: `%USERPROFILE%\.javarc`
 
-Esempio:
+Example:
 ```json
 {
   "custom_paths": [
@@ -263,28 +263,28 @@ Esempio:
 }
 ```
 
-### Modifica Manuale (Avanzato)
+### Manual Editing (Advanced)
 
-Puoi modificare manualmente il file `.javarc` con un editor di testo, poi esegui `jv list` per vedere le modifiche.
+You can manually edit the `.javarc` file with a text editor, then run `jv list` to see the changes.
 
 ## ❓ FAQ
 
 <details>
-<summary><b>Devo eseguire sempre come amministratore?</b></summary>
+<summary><b>Do I always need to run as administrator?</b></summary>
 
-No, solo il comando `jv use` richiede privilegi amministratore perché modifica le variabili d'ambiente di sistema. Gli altri comandi (`list`, `current`, `add-path`, ecc.) funzionano normalmente.
+No, only the `jv use` command requires administrator privileges because it modifies system environment variables. Other commands (`list`, `current`, `add-path`, etc.) work normally.
 </details>
 
 <details>
-<summary><b>Le modifiche sono permanenti?</b></summary>
+<summary><b>Are the changes permanent?</b></summary>
 
-Sì! `jv use` modifica le variabili d'ambiente di sistema in modo permanente. Le modifiche sopravvivono ai riavvii e sono visibili a tutte le applicazioni.
+Yes! `jv use` permanently modifies system environment variables. Changes survive reboots and are visible to all applications.
 </details>
 
 <details>
-<summary><b>Funziona con tutte le distribuzioni Java?</b></summary>
+<summary><b>Does it work with all Java distributions?</b></summary>
 
-Sì! Funziona con:
+Yes! It works with:
 - Oracle JDK
 - OpenJDK
 - Eclipse Adoptium (Temurin)
@@ -292,137 +292,137 @@ Sì! Funziona con:
 - Amazon Corretto
 - Microsoft OpenJDK
 - Liberica JDK
-- Qualsiasi altra distribuzione con la struttura standard `bin/java.exe`
+- Any other distribution with the standard `bin/java.exe` structure
 </details>
 
 <details>
-<summary><b>Posso usarlo con Java 8, 11, 17, 21?</b></summary>
+<summary><b>Can I use it with Java 8, 11, 17, 21?</b></summary>
 
-Sì, tutte le versioni Java sono supportate (da Java 1.6 in poi).
+Yes, all Java versions are supported (from Java 1.6 onwards).
 </details>
 
 <details>
-<summary><b>Cosa succede al PATH quando cambio versione?</b></summary>
+<summary><b>What happens to PATH when I switch versions?</b></summary>
 
-Il tool:
-1. Rimuove automaticamente vecchi path Java dal PATH
-2. Aggiunge `%JAVA_HOME%\bin` all'inizio del PATH
-3. Questo garantisce che la versione corretta sia sempre usata
+The tool:
+1. Automatically removes old Java paths from PATH
+2. Adds `%JAVA_HOME%\bin` at the beginning of PATH
+3. This ensures the correct version is always used
 </details>
 
 ## 🔧 Troubleshooting
 
-### "jv non è riconosciuto come comando"
+### "jv is not recognized as a command"
 
-**Causa**: `jv.exe` non è nel PATH
+**Cause**: `jv.exe` is not in PATH
 
-**Soluzione**:
+**Solution**:
 ```bash
-# Verifica dove si trova jv.exe
+# Check where jv.exe is located
 where jv
 
-# Se non viene trovato, aggiungilo al PATH (vedi sezione Installazione)
+# If not found, add it to PATH (see Installation section)
 ```
 
 ### "failed to open registry key (run as administrator)"
 
-**Causa**: Stai eseguendo `jv use` senza privilegi amministratore
+**Cause**: You're running `jv use` without administrator privileges
 
-**Soluzione**:
-1. Click destro su "CMD" o "PowerShell"
-2. Seleziona "Esegui come amministratore"
-3. Riesegui il comando
+**Solution**:
+1. Right-click "CMD" or "PowerShell"
+2. Select "Run as administrator"
+3. Re-run the command
 
 ### "No Java installations found"
 
-**Causa**: Java non è in una directory standard o non è installato
+**Cause**: Java is not in a standard directory or not installed
 
-**Soluzione**:
+**Solution**:
 ```bash
-# Aggiungi la directory dove hai installato Java
+# Add the directory where you installed Java
 jv add-path C:\path\to\java\directory
 
-# Oppure aggiungi l'installazione specifica
+# Or add the specific installation
 jv add C:\path\to\jdk
 ```
 
-### Le modifiche non si applicano subito
+### Changes don't apply immediately
 
-**Causa**: Il terminale o le applicazioni non hanno ricaricato le variabili d'ambiente
+**Cause**: The terminal or applications haven't reloaded environment variables
 
-**Soluzione**:
-1. Chiudi e riapri il terminale
-2. Riavvia le applicazioni (IDE, ecc.)
-3. In casi estremi, riavvia Windows
+**Solution**:
+1. Close and reopen the terminal
+2. Restart applications (IDEs, etc.)
+3. In extreme cases, restart Windows
 
-### Windows Defender blocca l'eseguibile
+### Windows Defender blocks the executable
 
-**Causa**: Windows potrebbe bloccare eseguibili scaricati da internet
+**Cause**: Windows may block executables downloaded from the internet
 
-**Soluzione**:
-1. Verifica la fonte (GitHub releases ufficiale)
-2. Compila da sorgente (Metodo 2)
-3. Aggiungi un'eccezione in Windows Defender
+**Solution**:
+1. Verify the source (official GitHub releases)
+2. Build from source (Method 2)
+3. Add an exception in Windows Defender
 
 ### "Invalid Java installation path"
 
-**Causa**: Il path specificato non contiene `bin\java.exe`
+**Cause**: The specified path doesn't contain `bin\java.exe`
 
-**Soluzione**:
+**Solution**:
 ```bash
-# Assicurati di specificare la directory ROOT del JDK
-# ✅ Corretto:
+# Make sure to specify the JDK ROOT directory
+# ✅ Correct:
 jv add C:\Program Files\Java\jdk-17
 
-# ❌ Sbagliato:
+# ❌ Wrong:
 jv add C:\Program Files\Java\jdk-17\bin
 ```
 
-## 🤝 Contribuire
+## 🤝 Contributing
 
-I contributi sono benvenuti! Se hai idee, bug reports o feature requests:
+Contributions are welcome! If you have ideas, bug reports, or feature requests:
 
-1. Apri una [Issue](https://github.com/USERNAME/java-changer/issues)
-2. Fai un Fork del progetto
-3. Crea un branch (`git checkout -b feature/amazing-feature`)
-4. Committa le modifiche (`git commit -m 'Add amazing feature'`)
-5. Pusha il branch (`git push origin feature/amazing-feature`)
-6. Apri una Pull Request
+1. Open an [Issue](https://github.com/USERNAME/java-changer/issues)
+2. Fork the project
+3. Create a branch (`git checkout -b feature/amazing-feature`)
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
-## 📄 Licenza
+## 📄 License
 
-Questo progetto è rilasciato sotto licenza MIT. Vedi il file [LICENSE](LICENSE) per dettagli.
+This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🌟 Extra
+## 🌟 Extras
 
-### Struttura del Progetto
+### Project Structure
 
 ```
 java-changer/
-├── cmd/jv/              # Entry point CLI
+├── cmd/jv/              # CLI entry point
 ├── internal/
-│   ├── java/            # Rilevamento versioni Java
-│   ├── config/          # Gestione configurazione
-│   └── env/             # Modifica variabili d'ambiente Windows
+│   ├── java/            # Java version detection
+│   ├── config/          # Configuration management
+│   └── env/             # Windows environment variables
 ├── go.mod
 └── README.md
 ```
 
-### Link Utili
+### Useful Links
 
-- 📖 [Guida Rapida (QUICKSTART.md)](QUICKSTART.md)
-- 📝 [Guida Installazione (INSTALL.md)](INSTALL.md)
-- 🏗️ [Struttura Progetto (PROJECT_STRUCTURE.md)](PROJECT_STRUCTURE.md)
+- 📖 [Quick Start Guide (QUICKSTART.md)](QUICKSTART.md)
+- 📝 [Installation Guide (INSTALL.md)](INSTALL.md)
+- 🏗️ [Project Structure (PROJECT_STRUCTURE.md)](PROJECT_STRUCTURE.md)
 - 📋 [Changelog (CHANGELOG.md)](CHANGELOG.md)
 
 ---
 
 <div align="center">
 
-**Fatto con ❤️ per semplificare lo sviluppo Java su Windows**
+**Made with ❤️ to simplify Java development on Windows**
 
-[⬆ Torna su](#java-version-switcher-jv)
+[⬆ Back to top](#java-version-switcher-jv)
 
 </div>

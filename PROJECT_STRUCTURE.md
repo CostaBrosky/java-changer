@@ -1,81 +1,79 @@
-# Struttura del Progetto
+# Project Structure
 
-Panoramica completa del progetto Java Version Switcher.
+Complete overview of the Java Version Switcher project.
 
-## Struttura Directory
+## Directory Structure
 
 ```
 java-changer/
 │
-├── .github/                          # Configurazione GitHub
+├── .github/                          # GitHub configuration
 │   ├── workflows/
-│   │   └── release.yml               # Pipeline CI/CD per releases automatiche
-│   └── README.md                     # Documentazione GitHub config
+│   │   └── release.yml               # CI/CD pipeline for automated releases
 │
-├── cmd/                              # Entry points dell'applicazione
+├── cmd/                              # Application entry points
 │   └── jv/
-│       └── main.go                   # CLI principale con tutti i comandi
+│       └── main.go                   # Main CLI with all commands
 │
-├── internal/                         # Codice interno (non esportabile)
-│   ├── java/                         # Gestione Java installations
-│   │   ├── version.go                # Strutture dati versioni Java
-│   │   └── detector.go               # Auto-rilevamento installazioni
-│   ├── config/                       # Gestione configurazione
+├── internal/                         # Internal code (not exportable)
+│   ├── java/                         # Java installation management
+│   │   ├── version.go                # Java version data structures
+│   │   └── detector.go               # Auto-detection of installations
+│   ├── config/                       # Configuration management
 │   │   └── config.go                 # Load/Save config, custom paths
-│   └── env/                          # Gestione environment variables
+│   └── env/                          # Environment variable management
 │       └── windows.go                # Windows Registry API integration
 │
 ├── go.mod                            # Go module definition
 ├── go.sum                            # Go dependencies checksums
 │
-├── build.bat                         # Script build per Windows
+├── build.bat                         # Windows build script
 ├── .gitignore                        # Git ignore rules
 │
-├── README.md                         # Documentazione principale
-├── QUICKSTART.md                     # Guida rapida per iniziare
-├── INSTALL.md                        # Guida installazione dettagliata
-├── RELEASE.md                        # Guida per creare releases
-├── CHANGELOG.md                      # Storia delle versioni
-└── PROJECT_STRUCTURE.md              # Questo file
+├── README.md                         # Main documentation
+├── QUICKSTART.md                     # Quick start guide
+├── INSTALL.md                        # Detailed installation guide
+├── CHANGELOG.md                      # Version history
+└── PROJECT_STRUCTURE.md              # This file
 ```
 
-## Componenti Principali
+## Main Components
 
 ### 1. CLI (`cmd/jv/main.go`)
 
-Entry point dell'applicazione. Gestisce:
-- Parsing dei comandi
-- Routing ai vari handler
-- Output user-friendly
-- Gestione errori
+Application entry point. Handles:
+- Command parsing
+- Routing to handlers
+- User-friendly output
+- Error handling
 
-**Comandi implementati:**
-- `list`, `use`, `current` - Gestione versioni
-- `add`, `remove` - Installazioni custom
+**Implemented commands:**
+- `list`, `use`, `current` - Version management
+- `add`, `remove` - Custom installations
 - `add-path`, `remove-path`, `list-paths` - Search paths
-- `version`, `help` - Utilità
+- `version`, `help` - Utilities
 
 ### 2. Java Detector (`internal/java/`)
 
-Responsabile di trovare e identificare installazioni Java.
+Responsible for finding and identifying Java installations.
 
 **`detector.go`:**
-- `FindAll()` - Trova tutte le installazioni (standard + custom)
-- `GetVersion()` - Estrae versione da una installazione
-- `IsValidJavaPath()` - Verifica se un path contiene Java
-- `IsValidSearchPath()` - Verifica se una directory esiste
+- `FindAll()` - Finds all installations (standard + custom)
+- `GetVersion()` - Extracts version from an installation
+- `IsValidJavaPath()` - Verifies if a path contains Java
+- `IsValidSearchPath()` - Verifies if a directory exists
 
-**Strategia di rilevamento:**
-1. Scansiona path standard (Program Files, etc.)
-2. Scansiona custom search paths da config
-3. Aggiunge installazioni custom specifiche
-4. Estrae versione da `java -version` o nome directory
+**Detection strategy:**
+1. Scans standard paths (Program Files, etc.)
+2. Scans custom search paths from config
+3. Adds specific custom installations
+4. Extracts version from `java -version` or directory name
 
 ### 3. Configuration Manager (`internal/config/`)
 
-Gestisce la configurazione persistente in `%USERPROFILE%\.javarc`.
+Manages persistent configuration in `%USERPROFILE%\.javarc`.
 
-**Struttura Config:**
+**Config structure:**
 ```json
 {
   "custom_paths": [
@@ -87,109 +85,69 @@ Gestisce la configurazione persistente in `%USERPROFILE%\.javarc`.
 }
 ```
 
-**Metodi principali:**
-- `Load()` / `Save()` - Gestione file config
-- `AddCustomPath()` / `RemoveCustomPath()` - Installazioni specifiche
-- `AddSearchPath()` / `RemoveSearchPath()` - Directory di ricerca
+**Main methods:**
+- `Load()` / `Save()` - Config file management
+- `AddCustomPath()` / `RemoveCustomPath()` - Specific installations
+- `AddSearchPath()` / `RemoveSearchPath()` - Search directories
 
 ### 4. Environment Manager (`internal/env/`)
 
-Gestisce le variabili d'ambiente Windows tramite Registry API.
+Manages Windows environment variables via Registry API.
 
-**Funzioni chiave:**
-- `SetJavaHome()` - Modifica JAVA_HOME e PATH
-- `updatePath()` - Rimuove vecchi path Java, aggiunge nuovo
-- `broadcastSettingChange()` - Notifica Windows delle modifiche
+**Key functions:**
+- `SetJavaHome()` - Modifies JAVA_HOME and PATH
+- `updatePath()` - Removes old Java paths, adds new
+- `broadcastSettingChange()` - Notifies Windows of changes
 
-**Dettagli tecnici:**
-- Usa `golang.org/x/sys/windows/registry`
-- Modifica `HKLM\System\CurrentControlSet\Control\Session Manager\Environment`
-- Richiede privilegi amministratore
-- Broadcast `WM_SETTINGCHANGE` per aggiornamento real-time
+**Technical details:**
+- Uses `golang.org/x/sys/windows/registry`
+- Modifies `HKLM\System\CurrentControlSet\Control\Session Manager\Environment`
+- Requires administrator privileges
+- Broadcasts `WM_SETTINGCHANGE` for real-time updates
 
-### 5. CI/CD Pipeline (`.github/workflows/release.yml`)
+## Typical Workflow
 
-Pipeline automatica per releases.
+### User runs: `jv use 17`
 
-**Trigger:**
-- Push di tag `v*` (es: `v1.0.0`)
-- Trigger manuale
+1. **main.go** receives the command
+2. **detector.FindAll()** finds all Java installations
+3. **main.go** searches for version matching "17"
+4. **env.SetJavaHome()** modifies registry:
+   - Updates `JAVA_HOME`
+   - Removes old Java paths from `PATH`
+   - Adds `%JAVA_HOME%\bin` to PATH
+   - Broadcasts changes
+5. Success output to user
 
-**Processo:**
-1. Checkout codice
-2. Setup Go 1.21
-3. Download dipendenze
-4. Build con versioning (`-ldflags`)
-5. Test eseguibile
-6. Crea ZIP con docs
-7. Genera checksums SHA256
-8. Crea GitHub Release automaticamente
-
-**Output:**
-- `jv.exe` - Eseguibile standalone
-- `jv-vX.Y.Z-windows-amd64.zip` - Package completo
-- `checksums.txt` - SHA256 checksums
-
-## Flusso di Lavoro Tipico
-
-### Utente esegue: `jv use 17`
-
-1. **main.go** riceve il comando
-2. **detector.FindAll()** trova tutte le installazioni Java
-3. **main.go** cerca versione matching "17"
-4. **env.SetJavaHome()** modifica registry:
-   - Aggiorna `JAVA_HOME`
-   - Rimuove vecchi path Java da `PATH`
-   - Aggiunge `%JAVA_HOME%\bin` al PATH
-   - Broadcast modifiche
-5. Output di successo all'utente
-
-### Sviluppatore crea release: `git tag v1.0.0`
-
-1. Tag pushato su GitHub
-2. **GitHub Actions** si attiva automaticamente
-3. **release.yml** workflow:
-   - Compila `jv.exe` per Windows
-   - Crea package ZIP
-   - Genera checksums
-   - Crea GitHub Release
-4. Release disponibile per il download
-
-## Dipendenze
+## Dependencies
 
 ### Runtime
-- Nessuna dipendenza runtime - tutto embedded
+- No runtime dependencies - everything is embedded
 
 ### Build Time
 - Go 1.21+
-- `golang.org/x/sys/windows` - API Windows
+- `golang.org/x/sys/windows` - Windows APIs
 
-### GitHub Actions
-- `actions/checkout@v4`
-- `actions/setup-go@v5`
-- `actions/upload-artifact@v4`
-- `softprops/action-gh-release@v1`
+## Security
 
-## Sicurezza
-
-- **Privilegi amministratore**: Richiesti solo per `jv use`
-- **Registry access**: Read per JAVA_HOME, Write per SetJavaHome
-- **No network**: Nessuna chiamata di rete
-- **No telemetry**: Zero raccolta dati
-- **Open source**: Codice completamente auditable
+- **Administrator privileges**: Required only for `jv use`
+- **Registry access**: Read for JAVA_HOME, Write for SetJavaHome
+- **No network**: No network calls
+- **No telemetry**: Zero data collection
+- **Open source**: Fully auditable code
 
 ## Performance
 
-- **Binary size**: ~2-3 MB (con ottimizzazioni `-s -w`)
+- **Binary size**: ~2-3 MB (with `-s -w` optimizations)
 - **Startup time**: < 100ms
-- **Scan time**: ~50-200ms (dipende da installazioni Java)
+- **Scan time**: ~50-200ms (depends on Java installations)
 - **Memory usage**: < 10 MB
 
-## Compatibilità
+## Compatibility
 
 - **OS**: Windows 10, Windows 11
 - **Architecture**: AMD64 (x86_64)
-- **Java versions**: Tutte (1.8+, 11, 17, 21, etc.)
+- **Java versions**: All (1.8+, 11, 17, 21, etc.)
 - **Java distributions**:
   - Oracle JDK
   - OpenJDK
@@ -197,47 +155,41 @@ Pipeline automatica per releases.
   - Zulu
   - Amazon Corretto
   - Microsoft OpenJDK
-  - Altri
+  - Others
 
 ## Testing
 
-### Test Manuali
+### Manual Testing
 ```bash
 # Build
 go build -o jv.exe ./cmd/jv
 
-# Test comandi base
+# Test basic commands
 jv.exe help
 jv.exe version
 jv.exe list
 jv.exe list-paths
 
-# Test come amministratore
+# Test as administrator
 jv.exe use 17
 ```
 
-### Test Pipeline
-```bash
-# Simula build pipeline
-go build -ldflags="-s -w -X main.Version=v1.0.0-test" -o jv.exe ./cmd/jv
-```
+## Contributing
 
-## Contribuire
+To contribute to the project:
 
-Per contribuire al progetto:
+1. Fork the repository
+2. Create a branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-1. Fork del repository
-2. Crea un branch (`git checkout -b feature/amazing-feature`)
-3. Commit modifiche (`git commit -m 'Add amazing feature'`)
-4. Push al branch (`git push origin feature/amazing-feature`)
-5. Apri una Pull Request
-
-Vedi anche i template per [Bug Reports](.github/ISSUE_TEMPLATE/bug_report.md) e [Feature Requests](.github/ISSUE_TEMPLATE/feature_request.md).
+See also templates for [Bug Reports](.github/ISSUE_TEMPLATE/bug_report.md) and [Feature Requests](.github/ISSUE_TEMPLATE/feature_request.md).
 
 ## License
 
-MIT License - Vedi LICENSE file per dettagli.
+MIT License - See LICENSE file for details.
 
 ---
 
-**Documentazione aggiornata al:** 2025
+**Documentation updated:** 2025
