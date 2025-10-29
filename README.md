@@ -6,16 +6,16 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![Windows](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)](https://www.microsoft.com/windows)
 
-## 🚀 Features
+## Features
 
-- ✅ **Auto-detection** of Java installations
-- ✅ **Permanent switching** modifies system environment variables (JAVA_HOME and PATH)
-- ✅ **Custom search paths** for non-standard directories
-- ✅ **Persistent configuration** saved automatically
-- ✅ **Zero dependencies** standalone executable
-- ✅ **All distributions supported** Oracle JDK, OpenJDK, Adoptium, Zulu, Corretto, Microsoft
+- **Auto-detection** of Java installations
+- **Permanent switching** modifies system environment variables (JAVA_HOME and PATH)
+- **Custom search paths** for non-standard directories
+- **Persistent configuration** saved automatically
+- **Zero dependencies** standalone executable
+- **All distributions supported** Oracle JDK, OpenJDK, Adoptium, Zulu, Corretto, Microsoft
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Prerequisites](#-prerequisites)
 - [Installation](#-installation)
@@ -29,13 +29,13 @@
 - [Contributing](#-contributing)
 - [License](#-license)
 
-## 🔧 Prerequisites
+## Prerequisites
 
 - **Operating System**: Windows 10 or Windows 11
 - **Go**: 1.21+ (only for building from source)
 - **Privileges**: Administrator (to modify system environment variables)
 
-## 📦 Installation
+## Installation
 
 ### Method 1: Download Executable (Recommended)
 
@@ -72,7 +72,7 @@ copy jv.exe C:\tools\
 6. Click "OK" on all windows
 7. **Restart your terminal**
 
-## 🛡️ Windows SmartScreen & Security Warning
+## Windows SmartScreen & Security Warning
 
 ### Why does Windows block this executable?
 
@@ -135,14 +135,14 @@ The checksum should match exactly with the one in `checksums.txt` from the relea
 
 Code signing certificates for Windows cost $200-500 per year and require identity verification. For a free, open-source tool, this cost is not justified. Instead:
 
-- ✅ All source code is **publicly available** on GitHub for audit
-- ✅ **SHA256 checksums** are provided to verify file integrity
-- ✅ The build process is **transparent** (you can build from source yourself)
-- ✅ The project is **open source** under MIT license
+- All source code is **publicly available** on GitHub for audit
+- **SHA256 checksums** are provided to verify file integrity
+- The build process is **transparent** (you can build from source yourself)
+- The project is **open source** under MIT license
 
 If you're concerned about security, you can always **build from source** (see Method 2 in Installation).
 
-## ⚡ Quick Start
+## Quick Start
 
 ```bash
 # 1. List all available Java versions
@@ -158,7 +158,7 @@ java -version
 
 **IMPORTANT**: The `jv use` command requires administrator privileges. Right-click on CMD/PowerShell → "Run as administrator"
 
-## 📚 Commands
+## Commands
 
 ### Version Management
 
@@ -190,7 +190,7 @@ java -version
 | `jv version` | Show jv version |
 | `jv help` | Show help message |
 
-## 💡 Examples
+## Examples
 
 ### Scenario 1: Switching between standard versions
 
@@ -256,7 +256,7 @@ jv add-path C:\DevTools\Java
 # If it contains jdk-17, jdk-19, jdk-21, finds all three
 ```
 
-## 🔍 How It Works
+## How It Works
 
 ### 1. Auto-detection
 
@@ -313,7 +313,7 @@ The tool identifies Java versions in two ways:
 1. **Runs `java -version`** and parses the output
 2. **Fallback**: extracts from directory name (e.g., `jdk-17`, `jdk1.8.0_322`)
 
-## ⚙️ Configuration
+## Configuration
 
 ### Configuration File
 
@@ -337,7 +337,7 @@ Example:
 
 You can manually edit the `.javarc` file with a text editor, then run `jv list` to see the changes.
 
-## ❓ FAQ
+## FAQ
 
 <details>
 <summary><b>Do I always need to run as administrator?</b></summary>
@@ -441,14 +441,14 @@ jv add C:\path\to\jdk
 **Solution**:
 ```bash
 # Make sure to specify the JDK ROOT directory
-# ✅ Correct:
+# Correct:
 jv add C:\Program Files\Java\jdk-17
 
-# ❌ Wrong:
+# Wrong:
 jv add C:\Program Files\Java\jdk-17\bin
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! If you have ideas, bug reports, or feature requests:
 
@@ -459,13 +459,13 @@ Contributions are welcome! If you have ideas, bug reports, or feature requests:
 5. Push to the branch (`git push origin feature/amazing-feature`)
 6. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🌟 Extras
+## Extras
 
 ### Project Structure
 
@@ -482,10 +482,10 @@ java-changer/            # CLI entry point
 
 ### Useful Links
 
-- 📖 [Quick Start Guide (QUICKSTART.md)](QUICKSTART.md)
-- 📝 [Installation Guide (INSTALL.md)](INSTALL.md)
-- 🏗️ [Project Structure (PROJECT_STRUCTURE.md)](PROJECT_STRUCTURE.md)
-- 📋 [Changelog (CHANGELOG.md)](CHANGELOG.md)
+- [Quick Start Guide (QUICKSTART.md)](QUICKSTART.md)
+- [Installation Guide (INSTALL.md)](INSTALL.md)
+- [Project Structure (PROJECT_STRUCTURE.md)](PROJECT_STRUCTURE.md)
+- [Changelog (CHANGELOG.md)](CHANGELOG.md)
 
 ---
 
