@@ -680,7 +680,6 @@ func printUsage() {
 	fmt.Println("    install           Install Java from open-source distributors")
 	fmt.Println("    doctor            Run diagnostics on your Java environment")
 	fmt.Println("    repair            Automatically fix configuration issues")
-	fmt.Println("    init              [Deprecated] Use 'jv install' instead")
 	fmt.Println()
 	fmt.Println("  Other:")
 	fmt.Println("    version           Show version information")

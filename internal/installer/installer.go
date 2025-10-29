@@ -298,7 +298,7 @@ func (i *Installer) ConfigureEnvironment(jdkPath string) error {
 		fmt.Println("⚠  Cannot set JAVA_HOME automatically (requires administrator)")
 		fmt.Println()
 		fmt.Println("To configure Java, run as administrator:")
-		fmt.Printf("  jv init\n")
+		fmt.Println("  jv repair")
 		fmt.Println()
 		fmt.Println("Or manually set JAVA_HOME to:")
 		fmt.Printf("  %s\n", jdkPath)

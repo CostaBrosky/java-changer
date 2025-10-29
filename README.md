@@ -168,7 +168,8 @@ java -version
 | Command | Description | Example |
 |---------|-------------|---------|
 | `jv install` | Install Java from open-source distributors (Adoptium, etc.) | `jv install` |
-| `jv init` | Initialize/repair Java environment variables | `jv init` |
+| `jv doctor` | Run diagnostics on your Java environment | `jv doctor` |
+| `jv repair` | Automatically fix configuration issues | `jv repair` |
 
 ### Version Management
 

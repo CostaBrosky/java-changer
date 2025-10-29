@@ -53,7 +53,8 @@ java -version
 ```bash
 # Installation & Setup
 jv install                      # Install Java from open-source distributors
-jv init                         # Initialize/repair Java environment variables
+jv doctor                       # Run diagnostics on your Java environment
+jv repair                       # Automatically fix configuration issues
 
 # Version management
 jv list                         # List all available versions

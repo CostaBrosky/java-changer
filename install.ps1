@@ -391,7 +391,7 @@ try {
     # Check for admin privileges and offer to elevate
     $isAdmin = Test-Administrator
     # Note: Admin privileges are not required for jv tool installation
-    # Only Java environment configuration (via 'jv install' or 'jv init') requires admin
+    # Only Java environment configuration (via 'jv install' or 'jv repair') requires admin
 
     Initialize-Environment
 
