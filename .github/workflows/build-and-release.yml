@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p dist
           # Build dell'eseguibile Windows
-          go build -trimpath -ldflags="-s -w" -o "dist/${APP_NAME}-windows-${GOARCH}.exe" ./cmd/jv
+          go build -trimpath -ldflags="-s -w" -o "dist/${APP_NAME}-windows-${GOARCH}.exe" .
 
       - name: Upload artifact (${{ matrix.arch }})
         uses: actions/upload-artifact@v4
