@@ -46,7 +46,9 @@ jobs:
           mkdir -p dist
           # Build dell'eseguibile Windows
           ls -lah
-          go build -trimpath -ldflags="-s -w" -o "dist/${APP_NAME}-windows-${GOARCH}.exe" /cmd/jv
+          cd dist
+          ls -lah
+          go build -trimpath -ldflags="-s -w" -o "dist/${APP_NAME}-windows-${GOARCH}.exe" ./dist/cmd/jv
 
       - name: Upload artifact (${{ matrix.arch }})
         uses: actions/upload-artifact@v4
