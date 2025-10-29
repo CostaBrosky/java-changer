@@ -147,5 +147,5 @@ func getConfigPath() string {
 		homeDir = "."
 	}
 
-	return filepath.Join(homeDir, ".javarc")
+	return filepath.Join(homeDir, "jv.json")
 }

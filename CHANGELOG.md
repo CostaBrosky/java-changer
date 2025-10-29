@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `jv list-paths` - Show all search paths (standard + custom)
   - `jv version` - Show version information
   - `jv help` - Show help message
-- Persistent configuration in `%USERPROFILE%\.javarc`
+- Persistent configuration in `%USERPROFILE%\js.json`
 - Windows Registry integration for system-wide changes
 - Comprehensive documentation (README, QUICKSTART, INSTALL guides)
 

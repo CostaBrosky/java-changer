@@ -277,7 +277,7 @@ Plus any custom search paths added with `jv add-path`.
 
 ### 2. Persistent Configuration
 
-Configuration is saved in `%USERPROFILE%\.javarc` (JSON file):
+Configuration is saved in `%USERPROFILE%\jv.json` (JSON file):
 
 ```json
 {
@@ -317,7 +317,7 @@ The tool identifies Java versions in two ways:
 
 ### Configuration File
 
-Location: `%USERPROFILE%\.javarc`
+Location: `%USERPROFILE%\jv.json`
 
 Example:
 ```json
@@ -335,7 +335,7 @@ Example:
 
 ### Manual Editing (Advanced)
 
-You can manually edit the `.javarc` file with a text editor, then run `jv list` to see the changes.
+You can manually edit the `jv.json` file with a text editor, then run `jv list` to see the changes.
 
 ## FAQ
 

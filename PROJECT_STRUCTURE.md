@@ -68,7 +68,7 @@ Responsible for finding and identifying Java installations.
 
 ### 3. Configuration Manager (`internal/config/`)
 
-Manages persistent configuration in `%USERPROFILE%\.javarc`.
+Manages persistent configuration in `%USERPROFILE%\jv.json`.
 
 **Config structure:**
 ```json

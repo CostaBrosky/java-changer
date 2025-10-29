@@ -174,7 +174,7 @@ To remove jv:
 
 2. (Optional) Remove the configuration:
    ```cmd
-   del %USERPROFILE%\.javarc
+   del %USERPROFILE%\jv.json
    ```
 
 3. (Optional) Remove `C:\tools` from PATH if you're not using it for other tools
