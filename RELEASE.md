@@ -107,7 +107,7 @@ Se vuoi testare il build prima di rilasciare:
 
 ```bash
 # Build con versione specifica
-go build -ldflags="-s -w -X main.Version=v1.0.0-test" -o jv.exe ./cmd/jv
+go build -ldflags="-s -w -X main.Version=v1.0.0-test" -o jv.exe .
 
 # Testa
 .\jv.exe version
@@ -161,7 +161,7 @@ git push origin v1.0.0
 
 La versione viene iniettata tramite ldflags. Verifica che:
 - Il tag inizi con `v` (es: `v1.0.0`, non `1.0.0`)
-- La variabile `Version` sia definita in `cmd/jv/main.go`
+- La variabile `Version` sia definita in `main.go`
 
 ### La release non viene creata automaticamente
 

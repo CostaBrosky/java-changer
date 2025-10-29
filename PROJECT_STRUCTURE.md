@@ -8,12 +8,8 @@ Complete overview of the Java Version Switcher project.
 java-changer/
 │
 ├── .github/                          # GitHub configuration
-│   ├── workflows/
-│   │   └── release.yml               # CI/CD pipeline for automated releases
-│
-├── cmd/                              # Application entry points
-│   └── jv/
-│       └── main.go                   # Main CLI with all commands
+│   └── workflows/
+│       └── release.yml               # CI/CD pipeline for automated releases
 │
 ├── internal/                         # Internal code (not exportable)
 │   ├── java/                         # Java installation management
@@ -24,6 +20,7 @@ java-changer/
 │   └── env/                          # Environment variable management
 │       └── windows.go                # Windows Registry API integration
 │
+├── main.go                           # Main CLI with all commands
 ├── go.mod                            # Go module definition
 ├── go.sum                            # Go dependencies checksums
 │
@@ -39,7 +36,7 @@ java-changer/
 
 ## Main Components
 
-### 1. CLI (`cmd/jv/main.go`)
+### 1. CLI (`main.go`)
 
 Application entry point. Handles:
 - Command parsing
@@ -162,8 +159,7 @@ Manages Windows environment variables via Registry API.
 ### Manual Testing
 ```bash
 # Build
-go build -o jv.exe ./cmd/jv
-
+go build -o jv.exe .
 # Test basic commands
 jv.exe help
 jv.exe version

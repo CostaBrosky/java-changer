@@ -56,7 +56,7 @@ cd java-changer
 go mod download
 
 # Build
-go build -ldflags="-s -w" -o jv.exe ./cmd/jv
+go build -ldflags="-s -w" -o jv.exe .
 
 # Copy to your tools directory
 copy jv.exe C:\tools\
@@ -400,12 +400,12 @@ This project is released under the MIT License. See the [LICENSE](LICENSE) file 
 ### Project Structure
 
 ```
-java-changer/
-├── cmd/jv/              # CLI entry point
+java-changer/            # CLI entry point
 ├── internal/
 │   ├── java/            # Java version detection
 │   ├── config/          # Configuration management
 │   └── env/             # Windows environment variables
+├── main.go              # Main Go file
 ├── go.mod
 └── README.md
 ```

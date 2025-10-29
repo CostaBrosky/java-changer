@@ -77,7 +77,7 @@ If you see the output, installation succeeded! 🎉
 
 3. **Build:**
    ```bash
-   go build -ldflags="-s -w" -o jv.exe ./cmd/jv
+   go build -ldflags="-s -w" -o jv.exe .
    ```
 
 4. **Verify:**
