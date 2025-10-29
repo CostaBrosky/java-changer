@@ -319,14 +319,14 @@ function Add-ToPath($directory) {
     Set-ItemProperty -Path $regPath -Name "Path" -Value $newPath
 
     # Broadcast environment change
-    Broadcast-EnvironmentChange
+    BroadcastEnvironmentChange
 
     Write-Success "Added to user PATH"
     return $true
 }
 
 # Broadcast environment variable changes
-function Broadcast-EnvironmentChange {
+function BroadcastEnvironmentChange {
     try {
         $HWND_BROADCAST = [IntPtr]0xffff
         $WM_SETTINGCHANGE = 0x1a
@@ -372,7 +372,9 @@ function Initialize-Config($javaInstallations) {
     }
 
     $configJson = $config | ConvertTo-Json -Depth 10
-    $configJson | Set-Content -Path $configPath -Encoding UTF8
+    # Use UTF8 without BOM to avoid parsing issues
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($configPath, $configJson, $utf8NoBom)
 
     Write-Success "Configuration created at: $configPath"
     return $configPath
