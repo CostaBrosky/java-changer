@@ -10,9 +10,6 @@ java-changer/
 ├── .github/                          # Configurazione GitHub
 │   ├── workflows/
 │   │   └── release.yml               # Pipeline CI/CD per releases automatiche
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.md             # Template per bug reports
-│   │   └── feature_request.md        # Template per feature requests
 │   └── README.md                     # Documentazione GitHub config
 │
 ├── cmd/                              # Entry points dell'applicazione
