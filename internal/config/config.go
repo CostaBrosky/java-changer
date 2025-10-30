@@ -21,6 +21,7 @@ type InstalledJDK struct {
 	Path        string `json:"path"`
 	Distributor string `json:"distributor"`
 	InstalledAt string `json:"installed_at"`
+	Scope       string `json:"scope"` // "system" or "user"
 }
 
 // Load loads the configuration from the user's home directory

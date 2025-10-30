@@ -8,12 +8,17 @@
 
 ## Features
 
-- **Auto-detection** of Java installations
-- **Permanent switching** modifies system environment variables (JAVA_HOME and PATH)
-- **Custom search paths** for non-standard directories
-- **Persistent configuration** saved automatically
-- **Zero dependencies** standalone executable
-- **All distributions supported** Oracle JDK, OpenJDK, Adoptium, Zulu, Corretto, Microsoft
+- 🎯 **Beautiful Interactive UI** - Navigate with arrow keys, powered by Huh! and Lip Gloss
+- 📊 **Animated Progress Bars** - Real-time download progress with speed indicator
+- 📦 **Batch Installation** - Install multiple Java versions at once
+- 🔍 **Auto-detection** of Java installations from multiple vendors
+- 🔄 **Permanent switching** - Modifies system environment variables (JAVA_HOME and PATH)
+- 🎨 **Colored Output** - Styled terminal output with visual hierarchy
+- ⌨️ **Shell Autocomplete** - Tab completion for PowerShell, Bash, and Fish
+- ✅ **Confirmation Prompts** - Prevents accidental operations
+- 💾 **Persistent configuration** - Tracks installations and preferences
+- 🚀 **Zero dependencies** - Standalone executable
+- 🌐 **All distributions supported** - Oracle JDK, OpenJDK, Adoptium, Zulu, Corretto, Microsoft
 
 ## Table of Contents
 
@@ -145,21 +150,32 @@ If you're concerned about security, you can always **build from source** (see Me
 ## Quick Start
 
 ```bash
-# 1. List all available Java versions
+# 1. List all available Java versions (beautiful colored output!)
 jv list
 
-# 2. If no Java found, install Java (interactive)
+# 2. If no Java found, install Java (interactive with arrows!)
 jv install
 
-# 3. Switch to Java 17 (RUN AS ADMINISTRATOR!)
+# 3. Switch to a version interactively (RUN AS ADMINISTRATOR!)
+jv switch
+# or
+jv use
+
+# 4. Or switch directly:
 jv use 17
 
-# 4. Verify current version
+# 5. Verify current version
 jv current
 java -version
+
+# 6. Check system health
+jv doctor
+
+# 7. Fix issues interactively
+jv repair
 ```
 
-**IMPORTANT**: The `jv use` and `jv install` commands require administrator privileges for system-wide configuration. Right-click on CMD/PowerShell → "Run as administrator"
+**IMPORTANT**: The `jv use`, `jv switch`, `jv install`, and `jv repair` commands require administrator privileges for system-wide configuration. Right-click on CMD/PowerShell → "Run as administrator"
 
 ## Commands
 
@@ -175,69 +191,216 @@ java -version
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `jv list` | List all available Java versions | `jv list` |
-| `jv use <version>` | Switch to specified version | `jv use 17` |
+| `jv list` | List all available Java versions (with colors!) | `jv list` |
+| `jv use [version]` | Switch to specified version (interactive if no version) | `jv use 17` or `jv use` |
+| `jv switch` | Quick interactive version switcher | `jv switch` |
 | `jv current` | Show current Java version | `jv current` |
 
 ### Custom Installations
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `jv add <path>` | Add a specific Java installation | `jv add C:\custom\jdk-21` |
-| `jv remove <path>` | Remove a custom installation | `jv remove C:\custom\jdk-21` |
+| `jv add <path>` | Add a specific Java installation (with confirmation) | `jv add C:\custom\jdk-21` |
+| `jv remove [path]` | Remove a custom installation (interactive if no path) | `jv remove` or `jv remove C:\custom\jdk-21` |
 
 ### Search Paths
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `jv add-path <dir>` | Add directory to scan for Java installations | `jv add-path C:\DevTools\Java` |
-| `jv remove-path <dir>` | Remove a search path | `jv remove-path C:\DevTools\Java` |
+| `jv add-path <dir>` | Add directory to scan for Java installations (with confirmation) | `jv add-path C:\DevTools\Java` |
+| `jv remove-path [dir]` | Remove a search path (interactive if no dir) | `jv remove-path` or `jv remove-path C:\DevTools\Java` |
 | `jv list-paths` | Show all search paths | `jv list-paths` |
 
 ### Utilities
 
-| Command | Description |
-|---------|-------------|
-| `jv version` | Show jv version |
-| `jv help` | Show help message |
+| Command | Description | Example |
+|---------|-------------|---------|
+| `jv version` | Show jv version | `jv version` |
+| `jv help` | Show help message | `jv help` |
 
 ## Examples
 
-### Scenario 0: Installing Java (new feature!)
+All commands now feature beautiful interactive UIs powered by Huh! and Lip Gloss! 🎨
 
-If you don't have Java installed or need additional versions:
+### Scenario 0: Installing Java (Interactive!)
+
+jv provides a beautiful, interactive installation experience powered by Huh!:
 
 ```bash
-# Interactive installation from open-source distributors
+# Interactive installation with arrow key navigation
 jv install
-
-# The tool will guide you through:
-# 1. Selecting a distributor (Adoptium/Temurin, Azul Zulu, etc.)
-# 2. Choosing a Java version (LTS or feature releases)
-# 3. Downloading and installing automatically
-# 4. Configuring JAVA_HOME if not set
-
-# After installation, the new version will be available
-jv list
-jv use 21
 ```
 
-**Note**: `jv install` currently supports Eclipse Adoptium (Temurin). More distributors coming soon!
+**Features:**
+- 🎯 **Navigate with arrow keys** - No more typing numbers!
+- ✨ **Visual selection** - See what you're choosing
+- 📦 **Batch installation** - Install multiple Java versions at once
+- ✅ **Smart detection** - Shows which versions are already installed
+- 🎨 **Beautiful UI** - Modern terminal experience
 
-### Scenario 1: Switching between standard versions
+**Installation Flow:**
+
+1. **Select Distributor** (currently Eclipse Adoptium)
+2. **Choose Mode:**
+   - Install single version
+   - Install multiple versions (batch)
+3. **Select Version(s):**
+   - Single: Use ↑↓ arrows, press Enter
+   - Multi: Use Space to select, Enter to confirm
+4. **Choose Scope:**
+   - System-wide (admin) - `C:\Program Files\...`
+   - User-only - `%USERPROFILE%\.jv\...`
+5. **Auto-download and install**
+
+**Example - Single Version:**
+```bash
+jv install
+→ Select "Install single version"
+→ Navigate to "Java 21 [LTS]"
+→ Press Enter
+→ Select scope
+→ Done!
+```
+
+**Example - Multiple Versions:**
+```bash
+jv install
+→ Select "Install multiple versions"
+→ Press Space on "Java 21 [LTS]"
+→ Press Space on "Java 17 [LTS]"
+→ Press Enter to confirm
+→ Select scope
+→ Both versions install automatically!
+```
+
+**Note**: Currently supports Eclipse Adoptium (Temurin). More distributors coming soon!
+
+### Interactive UI Examples
+
+**Quick Version Switcher:**
+```bash
+$ jv switch
+```
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Select Java Version                                             │
+│ Use arrow keys to navigate, Enter to select                     │
+│                                                                 │
+│   ○ 21.0.8         C:\Program Files\...\jdk-21 (system-wide)    │
+│ > ● 17.0.12        C:\Program Files\...\jdk-17 (auto)           │
+│   ○ 11.0.24        C:\Users\...\jdk-11 (user-only)              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Interactive Removal:**
+```bash
+$ jv remove
+```
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Select Java Installation to Remove                              │
+│ Use arrow keys to navigate, Enter to select                     │
+│                                                                 │
+│ > ● 17.0.12 - C:\custom\jdk-17                                  │
+│   ○ 11.0.24 - C:\custom\jdk-11                                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Remove Java 17.0.12?                                            │
+│ Path: C:\custom\jdk-17                                          │
+│                                                                 │
+│ > ● Yes   ○ No                                                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Health Check with Styled Output:**
+```bash
+$ jv doctor
+```
+```
+Java Version Switcher - System Diagnostics
+═══════════════════════════════════════════
+
+Checking JAVA_HOME...
+  ✓ JAVA_HOME is set and valid: C:\Program Files\Eclipse Adoptium\jdk-21
+
+Checking PATH...
+  ✓ %JAVA_HOME%\bin is in PATH
+
+...
+
+╭─────────────────────────────────────────────────────────────────╮
+│ ✓ All checks passed!                                            │
+│                                                                 │
+│ Your Java environment is properly configured.                   │
+╰─────────────────────────────────────────────────────────────────╯
+```
+
+**Download with Animated Progress Bar:**
+```bash
+$ jv install
+# After selecting version...
+```
+```
+Downloading JDK...
+
+[=========================================>           ] 75%
+
+204.5 MB / 273.2 MB (75%) - 12.34 MB/s
+```
+
+### Shell Autocomplete
+
+**PowerShell autocomplete is installed automatically!** 🎉
+
+When you install jv using `install.ps1`, the autocomplete is configured automatically in your PowerShell profile. Just restart PowerShell and it works!
+
+```powershell
+# After installing jv, restart PowerShell and try:
+jv <tab>          # Shows all commands
+jv use <tab>      # Shows all Java versions
+jv add C:\<tab>   # Path completion
+```
+
+**Skip autocomplete during install:**
+```powershell
+# If you don't want autocomplete
+.\install.ps1 -NoCompletion
+```
+
+**Note:** Autocomplete is currently Windows/PowerShell only. For WSL/Git Bash users, the completion script is embedded in `install.ps1` and can be extracted if needed.
+
+**What Gets Autocompleted:**
+- ✅ All jv commands with descriptions
+- ✅ Java versions for `jv use <tab>`
+- ✅ Directory paths for `jv add <tab>` and `jv add-path <tab>`
+- ✅ Custom paths for `jv remove <tab>`
+- ✅ Search paths for `jv remove-path <tab>`
+
+**How it works:** The `install.ps1` script embeds a PowerShell completion script directly in your `$PROFILE`. No need to run any commands - just restart PowerShell!
+
+### Scenario 1: Switching between versions (New Interactive Mode!)
 
 ```bash
-# List available versions
+# List available versions (with beautiful colors!)
 jv list
 
 # Output:
-# Available Java versions:
+# Available Java Versions:
 #
-# * 17.0.1          C:\Program Files\Java\jdk-17 (auto)
-#   11.0.12         C:\Program Files\Java\jdk-11 (auto)
-#   1.8.0_322       C:\Program Files\Java\jdk1.8.0_322 (auto)
+# → 21.0.8         C:\Program Files\Eclipse Adoptium\jdk-21 (system-wide)
+#   17.0.1         C:\Program Files\Java\jdk-17 (auto)
+#   11.0.12        C:\Users\username\.jv\jdk-11 (user-only)
 
-# Switch to Java 11
+# Switch interactively (navigate with arrows!)
+jv switch
+# or
+jv use
+
+# Or switch directly (classic mode)
 jv use 11
 
 # Verify

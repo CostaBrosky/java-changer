@@ -10,9 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
-// DownloadFile downloads a file from URL with progress tracking
+// DownloadFile downloads a file from URL with animated progress bar
 func DownloadFile(url string, destPath string) error {
 	out, err := os.Create(destPath)
 	if err != nil {
@@ -30,18 +33,48 @@ func DownloadFile(url string, destPath string) error {
 		return fmt.Errorf("download failed with status: %d", resp.StatusCode)
 	}
 
-	// Show progress
 	totalSize := resp.ContentLength
-	fmt.Printf("Downloading... (%.2f MB)\n", float64(totalSize)/1024/1024)
 
-	written, err := io.Copy(out, resp.Body)
+	// Create progress model
+	progressModel := NewProgressModel(totalSize)
+	p := tea.NewProgram(progressModel)
+
+	// Create progress writer
+	pw := newProgressWriter(totalSize, p)
+
+	// Start the progress UI in a goroutine
+	go func() {
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error running progress: %v\n", err)
+		}
+	}()
+
+	// Give the UI a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Create multi-writer: write to file AND progress tracker
+	multiWriter := io.MultiWriter(out, pw)
+
+	// Download with progress
+	written, err := io.Copy(multiWriter, resp.Body)
 	if err != nil {
+		p.Send(progressErrMsg{err: err})
+		p.Quit()
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
 	if written != totalSize {
-		return fmt.Errorf("incomplete download: got %d bytes, expected %d", written, totalSize)
+		err := fmt.Errorf("incomplete download: got %d bytes, expected %d", written, totalSize)
+		p.Send(progressErrMsg{err: err})
+		p.Quit()
+		return err
 	}
+
+	// Signal completion
+	p.Send(downloadCompleteMsg{})
+
+	// Wait a moment for UI to finish
+	time.Sleep(200 * time.Millisecond)
 
 	return nil
 }
@@ -129,11 +162,12 @@ func ExtractZip(zipPath string, destDir string) (string, error) {
 }
 
 // InstallJDK orchestrates the download, verification, and extraction of a JDK
-func InstallJDK(downloadInfo *DownloadInfo, version string, distributor string, isAdmin bool) (string, error) {
+func InstallJDK(downloadInfo *DownloadInfo, version string, distributor string, isSystemWide bool) (string, error) {
 	// Determine installation base directory
 	var installBase string
-	if isAdmin {
-		installBase = filepath.Join("C:", "Program Files", distributor)
+	if isSystemWide {
+		// Use absolute path for system-wide installation
+		installBase = filepath.Join(`C:\Program Files`, distributor)
 	} else {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -161,20 +195,38 @@ func InstallJDK(downloadInfo *DownloadInfo, version string, distributor string, 
 		return "", fmt.Errorf("download failed: %w", err)
 	}
 
-	// Verify checksum
-	fmt.Println("Verifying checksum...")
-	if err := VerifyChecksum(zipPath, downloadInfo.Checksum); err != nil {
-		return "", fmt.Errorf("checksum verification failed: %w", err)
+	// Verify checksum with spinner
+	var checksumErr error
+	spinnerErr := WithSpinner("Verifying checksum...", func() error {
+		checksumErr = VerifyChecksum(zipPath, downloadInfo.Checksum)
+		return nil
+	})
+	if spinnerErr != nil {
+		return "", spinnerErr
 	}
-	fmt.Println("Checksum verified successfully")
+	if checksumErr != nil {
+		return "", fmt.Errorf("checksum verification failed: %w", checksumErr)
+	}
+	fmt.Println("✓ Checksum verified successfully")
 
-	// Extract to temp location
-	fmt.Println("Extracting JDK...")
+	// Extract to temp location with spinner
+	var extractedPath string
+	var extractErr error
 	tempExtractDir := filepath.Join(tempDir, "extract")
-	extractedPath, err := ExtractZip(zipPath, tempExtractDir)
-	if err != nil {
-		return "", fmt.Errorf("extraction failed: %w", err)
+
+	spinnerErr = WithSpinner("Extracting JDK...", func() error {
+		var err error
+		extractedPath, err = ExtractZip(zipPath, tempExtractDir)
+		extractErr = err
+		return nil
+	})
+	if spinnerErr != nil {
+		return "", spinnerErr
 	}
+	if extractErr != nil {
+		return "", fmt.Errorf("extraction failed: %w", extractErr)
+	}
+	fmt.Println("✓ JDK extracted successfully")
 
 	// Verify java.exe exists
 	javaExe := filepath.Join(extractedPath, "bin", "java.exe")

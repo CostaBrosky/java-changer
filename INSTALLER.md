@@ -13,6 +13,7 @@ The `install.ps1` script provides automated installation of `jv`. Java installat
 - ✅ Auto-detects Windows architecture (x64, x86, ARM64)
 - ✅ Scans for existing Java installations
 - ✅ Automatic PATH configuration
+- ✅ **Automatic PowerShell autocomplete installation** (NEW!)
 - ✅ Creates initial configuration file
 - ✅ Interactive and silent modes
 - ✅ Lightweight and focused (Java management via `jv install` command)
@@ -33,12 +34,13 @@ irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 | `-Version` | string | "latest" | Version of jv to install |
 | `-InstallDir` | string | `$HOME\.local\bin` | Installation directory |
 | `-NoModifyPath` | switch | false | Don't modify PATH |
+| `-NoCompletion` | switch | false | Skip PowerShell autocomplete installation |
 | `-Silent` | switch | false | Non-interactive mode |
 
 ### Examples
 
 ```powershell
-# Basic installation
+# Basic installation (with autocomplete!)
 irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex
 
 # Silent installation for CI/CD
@@ -47,13 +49,21 @@ irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Arg
 # Custom installation directory
 irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-InstallDir", "C:\tools"
 
+# Skip autocomplete installation
+irm https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 | iex -Args "-NoCompletion"
+
 # Download script and run locally
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/CostaBrosky/jv/main/install.ps1 -OutFile install.ps1
 .\install.ps1
 
-# After installation, use jv to install Java
-jv install
+# After installation, restart PowerShell:
+# 1. Autocomplete is already enabled!
+# 2. Try: jv <tab>
+# 3. Try: jv use <tab>
+# 4. Use jv to install Java: jv install
 ```
+
+**Note:** The `-NoCompletion` flag skips autocomplete installation if you don't want it.
 
 ## Installation Flow
 
@@ -127,7 +137,36 @@ Creates `%USERPROFILE%\.config\jv\jv.json` with detected Java installations:
 
 The `installed_jdks` array will be populated when using `jv install` command.
 
-### 8. Cleanup
+### 8. PowerShell Autocomplete Installation (NEW!)
+
+Automatically sets up tab completion without requiring `jv.exe` to be in PATH:
+
+**Process:**
+1. Checks if `$PROFILE` exists (creates if needed)
+2. Reads current profile content
+3. Checks for duplicates (avoids re-installing)
+4. Appends completion script inline (self-contained PowerShell code)
+5. Writes to profile with UTF-8 no BOM
+
+**Completion Script Includes:**
+- `Register-ArgumentCompleter` for `jv` command
+- `Get-JvVersions()` - Parses `jv list` output for version completion
+- `Get-JvCustomPaths()` - Reads config for `jv remove` completion
+- `Get-JvSearchPaths()` - Reads config for `jv remove-path` completion
+- Path completion for `jv add` and `jv add-path`
+
+**Result:** After restarting PowerShell:
+- `jv <tab>` → Shows all commands with descriptions
+- `jv use <tab>` → Shows Java versions (e.g., 21, 17, 11)
+- `jv add <tab>` → Directory path completion
+- `jv remove <tab>` → Custom paths from config
+- `jv remove-path <tab>` → Search paths from config
+
+**Skip with:** `-NoCompletion` parameter
+
+**Why inline?** The completion script is embedded directly in PowerShell (no dependency on `jv.exe`), so it works immediately without requiring PATH refresh.
+
+### 9. Cleanup
 
 - Removes temporary download directory
 - Displays success message and next steps
@@ -150,13 +189,69 @@ After installing the `jv` tool, Java distributions can be installed using the `j
 ### Usage
 
 ```bash
-# Interactive installation
+# Interactive installation with beautiful TUI
 jv install
+```
 
-# Follow the prompts to:
-# 1. Select distributor (currently: Eclipse Adoptium)
-# 2. Choose Java version (LTS or feature release)
-# 3. Download and install automatically
+**Interactive Features:**
+- **Arrow key navigation** (↑↓) - No typing required
+- **Visual selection** - See what you're choosing in real-time
+- **Multi-select support** - Install multiple versions with Space key
+- **Smart detection** - Shows [Installed] markers
+- **Keyboard shortcuts:**
+  - `↑↓` or `j/k`: Navigate
+  - `Space`: Toggle selection (multi-select)
+  - `Enter`: Confirm
+  - `Ctrl+C`: Cancel
+
+**Installation Flow:**
+1. Select distributor (currently: Eclipse Adoptium)
+2. Choose installation mode:
+   - Single version
+   - Multiple versions (batch)
+3. Select version(s) - navigate with arrows, select with Space
+4. Select installation scope (system-wide or user-only, if admin)
+5. Auto-download and install
+
+### Installation Scopes
+
+**With administrator privileges:**
+
+You can choose between:
+- **System-wide** (recommended): Installs to `C:\Program Files\Eclipse Adoptium\jdk-{version}`, available for all users
+- **User-only**: Installs to `%USERPROFILE%\.jv\jdk-{version}`, only for current user
+
+**Without administrator privileges:**
+
+- Automatically installs to `%USERPROFILE%\.jv\jdk-{version}` (user-only)
+- JAVA_HOME cannot be set automatically (requires running `jv use` as administrator)
+
+### Scope Tracking
+
+Installations via `jv install` are tracked in the config file with their scope:
+
+```json
+{
+  "installed_jdks": [
+    {
+      "version": "21",
+      "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-21",
+      "distributor": "Eclipse Adoptium",
+      "installed_at": "2025-10-30T12:34:56Z",
+      "scope": "system"
+    }
+  ]
+}
+```
+
+This allows `jv list` to show the installation scope:
+
+```
+Available Java versions:
+
+* 21.0.8          C:\Program Files\Eclipse Adoptium\jdk-21 (installed, system-wide)
+  17.0.12         C:\Users\username\.jv\jdk-17 (installed, user-only)
+  11.0.24         C:\Program Files\Java\jdk-11 (auto)
 ```
 
 ### Supported Distributors

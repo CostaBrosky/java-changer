@@ -37,10 +37,15 @@ copy jv.exe C:\tools\
 ### 3. Use the tool
 
 ```bash
-# List available Java versions
+# List available Java versions (with beautiful colors!)
 jv list
 
-# Switch to Java 17 (RUN AS ADMINISTRATOR!)
+# Switch to Java 17 - Interactive mode (RUN AS ADMINISTRATOR!)
+jv switch
+# or navigate with arrows:
+jv use
+
+# Or use classic mode:
 jv use 17
 
 # Verify current version
@@ -51,8 +56,11 @@ java -version
 ## Main Commands
 
 ```bash
-# Installation & Setup
-jv install                      # Install Java from open-source distributors
+# Installation & Setup (Interactive!)
+jv install                      # Install Java with beautiful interactive UI
+                                # → Navigate with ↑↓ arrows
+                                # → Select multiple with Space
+                                # → Confirm with Enter
 jv doctor                       # Run diagnostics on your Java environment
 jv repair                       # Automatically fix configuration issues
 
@@ -72,6 +80,32 @@ jv remove-path C:\DevTools\Java # Remove search path
 # Help
 jv help                         # Show complete help
 ```
+
+**Interactive Features:**
+- Use **↑↓** or **j/k** to navigate
+- Press **Space** to select (multi-select mode)
+- Press **Enter** to confirm
+- Press **Ctrl+C** to cancel
+
+## Shell Autocomplete (Tab Completion)
+
+**✨ Autocomplete is installed automatically!**
+
+When you install jv using the PowerShell installer, autocomplete is configured automatically. Just restart your terminal!
+
+```powershell
+# After installation, restart PowerShell and try:
+jv <tab>          # Lists all commands
+jv use <tab>      # Lists all Java versions
+jv add C:\<tab>   # Path completion
+```
+
+**What gets autocompleted:**
+- ✅ All jv commands
+- ✅ Java versions (for `jv use`)
+- ✅ File paths (for `jv add`, `jv add-path`)
+- ✅ Custom paths (for `jv remove`)
+- ✅ Search paths (for `jv remove-path`)
 
 **Difference between `add` and `add-path`:**
 - `add`: For a single installation (e.g., `C:\custom\jdk-17`)

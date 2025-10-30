@@ -9,10 +9,25 @@ import (
 	"jv/internal/env"
 	"jv/internal/installer"
 	"jv/internal/java"
+	"jv/internal/theme"
+
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Version is set during build time via ldflags
 var Version = "dev"
+
+// Use JV custom theme
+var (
+	successStyle = theme.SuccessStyle
+	errorStyle   = theme.ErrorStyle
+	warningStyle = theme.WarningStyle
+	infoStyle    = theme.InfoStyle
+	titleStyle   = theme.Title
+	boxStyle     = theme.Box
+	currentStyle = theme.CurrentStyle
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -41,6 +56,8 @@ func main() {
 		handleListPaths()
 	case "install":
 		handleInstall()
+	case "switch":
+		handleSwitch()
 	case "doctor":
 		handleDoctor()
 	case "repair":
@@ -58,6 +75,82 @@ func main() {
 
 func handleList() {
 	detector := java.NewDetector()
+
+	var versions []java.Version
+	var scanErr error
+
+	// Scan with spinner
+	java.WithScanner(func() error {
+		var err error
+		versions, err = detector.FindAll()
+		scanErr = err
+		return nil
+	})
+
+	if scanErr != nil {
+		fmt.Println(errorStyle.Render("Error finding Java versions: " + scanErr.Error()))
+		os.Exit(1)
+	}
+
+	if len(versions) == 0 {
+		fmt.Println(warningStyle.Render("No Java installations found."))
+		fmt.Println(infoStyle.Render("Run 'jv install' to install Java."))
+		return
+	}
+
+	// Load config to get scope info
+	cfg, _ := config.Load()
+	scopeMap := make(map[string]string)
+	for _, jdk := range cfg.InstalledJDKs {
+		scopeMap[jdk.Path] = jdk.Scope
+	}
+
+	current := os.Getenv("JAVA_HOME")
+
+	fmt.Println(titleStyle.Render("Available Java Versions:"))
+	fmt.Println()
+
+	for _, v := range versions {
+		marker := "  "
+		versionStr := v.Version
+
+		if strings.EqualFold(v.Path, current) {
+			marker = "→ "
+			versionStr = currentStyle.Render(v.Version)
+		}
+
+		source := "auto"
+		sourceStyle := theme.Faint
+
+		if v.IsCustom {
+			source = "custom"
+		}
+
+		// Add scope info if available
+		if scope, found := scopeMap[v.Path]; found {
+			switch scope {
+			case "system":
+				source = "system-wide"
+				sourceStyle = successStyle
+			case "user":
+				source = "user-only"
+				sourceStyle = infoStyle
+			}
+		}
+
+		fmt.Printf("%s%-15s %s %s\n", marker, versionStr, v.Path, sourceStyle.Render("("+source+")"))
+	}
+
+	fmt.Println()
+
+	if current == "" {
+		fmt.Println(theme.WarningMessage("JAVA_HOME is not set"))
+		fmt.Println(theme.Faint.Render("  Run 'jv use <version>' or 'jv switch' to configure"))
+	}
+}
+
+func handleUse() {
+	detector := java.NewDetector()
 	versions, err := detector.FindAll()
 	if err != nil {
 		fmt.Printf("Error finding Java versions: %v\n", err)
@@ -66,58 +159,48 @@ func handleList() {
 
 	if len(versions) == 0 {
 		fmt.Println("No Java installations found.")
-		return
-	}
-
-	current := os.Getenv("JAVA_HOME")
-	fmt.Println("Available Java versions:")
-	fmt.Println()
-
-	for _, v := range versions {
-		marker := "  "
-		if strings.EqualFold(v.Path, current) {
-			marker = "* "
-		}
-		source := "auto"
-		if v.IsCustom {
-			source = "custom"
-		}
-		fmt.Printf("%s%-15s %s (%s)\n", marker, v.Version, v.Path, source)
-	}
-}
-
-func handleUse() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: jv use <version>")
-		fmt.Println("Example: jv use 17")
-		os.Exit(1)
-	}
-
-	version := os.Args[2]
-
-	detector := java.NewDetector()
-	versions, err := detector.FindAll()
-	if err != nil {
-		fmt.Printf("Error finding Java versions: %v\n", err)
+		fmt.Println("Run 'jv install' to install Java.")
 		os.Exit(1)
 	}
 
 	var target *java.Version
-	for i, v := range versions {
-		if strings.Contains(v.Version, version) {
-			target = &versions[i]
-			break
+
+	// Interactive mode if no version specified
+	if len(os.Args) < 3 {
+		selected, err := selectJavaVersion(versions)
+		if err != nil {
+			fmt.Printf("Selection cancelled: %v\n", err)
+			os.Exit(1)
+		}
+		target = selected
+	} else {
+		// Direct mode with version argument
+		version := os.Args[2]
+		for i, v := range versions {
+			if strings.Contains(v.Version, version) {
+				target = &versions[i]
+				break
+			}
+		}
+
+		if target == nil {
+			fmt.Printf("Java version '%s' not found.\n", version)
+			fmt.Println("Use 'jv list' to see available versions.")
+			os.Exit(1)
 		}
 	}
 
-	if target == nil {
-		fmt.Printf("Java version '%s' not found.\n", version)
-		fmt.Println("Use 'jv list' to see available versions.")
-		os.Exit(1)
+	// Confirm switch
+	confirmed, err := confirmAction(
+		fmt.Sprintf("Switch to Java %s?", target.Version),
+		fmt.Sprintf("Path: %s", target.Path),
+	)
+	if err != nil || !confirmed {
+		fmt.Println("Operation cancelled.")
+		os.Exit(0)
 	}
 
 	fmt.Printf("Switching to Java %s...\n", target.Version)
-	fmt.Printf("Path: %s\n", target.Path)
 
 	if err := env.SetJavaHome(target.Path); err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -126,8 +209,9 @@ func handleUse() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Successfully updated JAVA_HOME!")
-	fmt.Println("\nNote: You may need to restart your terminal or applications for changes to take effect.")
+	fmt.Println(successStyle.Render("✓ Successfully updated JAVA_HOME!"))
+	fmt.Println()
+	fmt.Println(lipgloss.NewStyle().Faint(true).Render("Note: You may need to restart your terminal or applications for changes to take effect."))
 }
 
 func handleCurrent() {
@@ -146,8 +230,8 @@ func handleCurrent() {
 
 func handleAdd() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: jv add <path>")
-		fmt.Println("Example: jv add C:\\custom\\jdk-21")
+		fmt.Println(errorStyle.Render("Usage: jv add <path>"))
+		fmt.Println(infoStyle.Render("Example: jv add C:\\custom\\jdk-21"))
 		os.Exit(1)
 	}
 
@@ -167,7 +251,19 @@ func handleAdd() {
 	}
 
 	if cfg.HasCustomPath(path) {
-		fmt.Println("This path is already in the custom paths list.")
+		fmt.Println(warningStyle.Render("This path is already in the custom paths list."))
+		return
+	}
+
+	version := detector.GetVersion(path)
+
+	// Confirm addition
+	confirmed, err := confirmAction(
+		fmt.Sprintf("Add Java %s?", version),
+		fmt.Sprintf("Path: %s", path),
+	)
+	if err != nil || !confirmed {
+		fmt.Println("Operation cancelled.")
 		return
 	}
 
@@ -177,45 +273,84 @@ func handleAdd() {
 		os.Exit(1)
 	}
 
-	version := detector.GetVersion(path)
-	fmt.Printf("Added Java %s to custom paths.\n", version)
+	fmt.Printf("✓ Added Java %s to custom paths.\n", version)
 }
 
 func handleRemove() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: jv remove <path>")
-		fmt.Println("Example: jv remove C:\\custom\\jdk-21")
-		os.Exit(1)
-	}
-
-	path := os.Args[2]
-
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
 		os.Exit(1)
 	}
 
-	if !cfg.HasCustomPath(path) {
-		fmt.Println("This path is not in the custom paths list.")
+	var pathToRemove string
+
+	// Interactive mode if no path specified
+	if len(os.Args) < 3 {
+		if len(cfg.CustomPaths) == 0 {
+			fmt.Println("No custom Java installations to remove.")
+			fmt.Println("Use 'jv add <path>' to add one.")
+			return
+		}
+
+		// Build options
+		detector := java.NewDetector()
+		options := make([]huh.Option[string], len(cfg.CustomPaths))
+		for i, path := range cfg.CustomPaths {
+			version := detector.GetVersion(path)
+			label := fmt.Sprintf("%s - %s", version, path)
+			options[i] = huh.NewOption(label, path)
+		}
+
+		err := huh.NewSelect[string]().
+			Title("Select Java Installation to Remove").
+			Description("Use arrow keys to navigate, Enter to select").
+			Options(options...).
+			Value(&pathToRemove).
+			Run()
+
+		if err != nil {
+			fmt.Printf("Selection cancelled: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		pathToRemove = os.Args[2]
+	}
+
+	if !cfg.HasCustomPath(pathToRemove) {
+		fmt.Println(warningStyle.Render("This path is not in the custom paths list."))
 		return
 	}
 
-	cfg.RemoveCustomPath(path)
+	// Confirm removal
+	detector := java.NewDetector()
+	version := detector.GetVersion(pathToRemove)
+	confirmed, err := confirmAction(
+		fmt.Sprintf("Remove Java %s?", version),
+		fmt.Sprintf("Path: %s", pathToRemove),
+	)
+	if err != nil || !confirmed {
+		fmt.Println("Operation cancelled.")
+		return
+	}
+
+	cfg.RemoveCustomPath(pathToRemove)
+	cfg.RemoveInstalledJDK(pathToRemove) // Also remove from installed JDKs if present
+
 	if err := cfg.Save(); err != nil {
 		fmt.Printf("Error saving config: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Removed from custom paths.")
+	fmt.Println(successStyle.Render("✓ Removed from custom paths."))
 }
 
 func handleAddPath() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: jv add-path <directory>")
-		fmt.Println("Example: jv add-path C:\\DevTools\\Java")
+		fmt.Println(errorStyle.Render("Usage: jv add-path <directory>"))
+		fmt.Println(infoStyle.Render("Example: jv add-path C:\\DevTools\\Java"))
 		fmt.Println()
-		fmt.Println("This adds a directory where the detector will search for Java installations.")
+		fmt.Println(lipgloss.NewStyle().Faint(true).Render("This adds a directory where the detector will search for Java installations."))
 		os.Exit(1)
 	}
 
@@ -235,7 +370,17 @@ func handleAddPath() {
 	}
 
 	if cfg.HasSearchPath(path) {
-		fmt.Println("This search path is already configured.")
+		fmt.Println(warningStyle.Render("This search path is already configured."))
+		return
+	}
+
+	// Confirm addition
+	confirmed, err := confirmAction(
+		"Add search path?",
+		fmt.Sprintf("Path: %s\n\nThe detector will scan this directory for Java installations.", path),
+	)
+	if err != nil || !confirmed {
+		fmt.Println("Operation cancelled.")
 		return
 	}
 
@@ -245,54 +390,95 @@ func handleAddPath() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Added search path: %s\n", path)
-	fmt.Println("The detector will now scan this directory for Java installations.")
+	fmt.Printf("✓ Added search path: %s\n", path)
 	fmt.Println("Run 'jv list' to see detected versions.")
 }
 
 func handleRemovePath() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: jv remove-path <directory>")
-		fmt.Println("Example: jv remove-path C:\\DevTools\\Java")
-		os.Exit(1)
-	}
-
-	path := os.Args[2]
-
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
 		os.Exit(1)
 	}
 
-	if !cfg.HasSearchPath(path) {
-		fmt.Println("This path is not in the search paths list.")
+	var pathToRemove string
+
+	// Interactive mode if no path specified
+	if len(os.Args) < 3 {
+		if len(cfg.SearchPaths) == 0 {
+			fmt.Println("No custom search paths to remove.")
+			fmt.Println("Use 'jv add-path <directory>' to add one.")
+			return
+		}
+
+		// Build options
+		options := make([]huh.Option[string], len(cfg.SearchPaths))
+		for i, path := range cfg.SearchPaths {
+			options[i] = huh.NewOption(path, path)
+		}
+
+		err := huh.NewSelect[string]().
+			Title("Select Search Path to Remove").
+			Description("Use arrow keys to navigate, Enter to select").
+			Options(options...).
+			Value(&pathToRemove).
+			Run()
+
+		if err != nil {
+			fmt.Printf("Selection cancelled: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		pathToRemove = os.Args[2]
+	}
+
+	if !cfg.HasSearchPath(pathToRemove) {
+		fmt.Println(warningStyle.Render("This path is not in the search paths list."))
 		return
 	}
 
-	cfg.RemoveSearchPath(path)
+	// Confirm removal
+	confirmed, err := confirmAction(
+		"Remove search path?",
+		fmt.Sprintf("Path: %s", pathToRemove),
+	)
+	if err != nil || !confirmed {
+		fmt.Println("Operation cancelled.")
+		return
+	}
+
+	cfg.RemoveSearchPath(pathToRemove)
 	if err := cfg.Save(); err != nil {
 		fmt.Printf("Error saving config: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Removed search path.")
+	fmt.Println(successStyle.Render("✓ Removed search path."))
 }
 
 func handleListPaths() {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Printf("Error loading config: %v\n", err)
+		fmt.Println(errorStyle.Render("Error loading config: " + err.Error()))
 		os.Exit(1)
 	}
 
 	detector := java.NewDetector()
 
-	fmt.Println("Java search paths:")
+	fmt.Println(titleStyle.Render("Java Search Paths"))
 	fmt.Println()
 
-	// Show standard paths
-	fmt.Println("Standard paths (built-in):")
+	// Table styles from theme
+	headerStyle := theme.TableHeader
+	cellStyle := theme.TableCell
+	existsStyle := theme.SuccessStyle.Padding(0, 1)
+	notFoundStyle := theme.ErrorStyle.Padding(0, 1)
+	tableStyle := theme.TableStyle
+
+	// Standard paths table
+	fmt.Println(theme.LabelStyle.Render("Standard Paths (built-in):"))
+	fmt.Println()
+
 	standardPaths := []string{
 		"C:\\Program Files\\Java",
 		"C:\\Program Files (x86)\\Java",
@@ -303,34 +489,66 @@ func handleListPaths() {
 		"C:\\Program Files\\Microsoft",
 	}
 
+	var rows []string
+	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
+		headerStyle.Render("Path"),
+		headerStyle.Width(50).Render(""),
+		headerStyle.Render("Status"),
+	))
+
 	for _, p := range standardPaths {
 		exists := detector.IsValidSearchPath(p)
-		marker := ""
+		status := ""
 		if exists {
-			marker = " [exists]"
+			status = existsStyle.Render("✓ Exists")
+		} else {
+			status = cellStyle.Faint(true).Render("Not found")
 		}
-		fmt.Printf("  %s%s\n", p, marker)
+
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
+			cellStyle.Width(58).Render(p),
+			status,
+		))
 	}
 
-	// Show custom paths
+	table := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	fmt.Println(tableStyle.Render(table))
+	fmt.Println()
+
+	// Custom paths table
 	if len(cfg.SearchPaths) > 0 {
+		fmt.Println(theme.LabelStyle.Render("Custom Search Paths:"))
 		fmt.Println()
-		fmt.Println("Custom search paths:")
+
+		var customRows []string
+		customRows = append(customRows, lipgloss.JoinHorizontal(lipgloss.Left,
+			headerStyle.Render("Path"),
+			headerStyle.Width(50).Render(""),
+			headerStyle.Render("Status"),
+		))
+
 		for _, p := range cfg.SearchPaths {
 			exists := detector.IsValidSearchPath(p)
-			marker := ""
+			status := ""
 			if exists {
-				marker = " [exists]"
+				status = existsStyle.Render("✓ Exists")
 			} else {
-				marker = " [not found]"
+				status = notFoundStyle.Render("✗ Not found")
 			}
-			fmt.Printf("  %s%s\n", p, marker)
+
+			customRows = append(customRows, lipgloss.JoinHorizontal(lipgloss.Left,
+				cellStyle.Width(58).Render(p),
+				status,
+			))
 		}
+
+		customTable := lipgloss.JoinVertical(lipgloss.Left, customRows...)
+		fmt.Println(tableStyle.Render(customTable))
 	} else {
-		fmt.Println()
-		fmt.Println("No custom search paths configured.")
-		fmt.Println("Use 'jv add-path <directory>' to add one.")
+		fmt.Println(infoStyle.Render("No custom search paths configured."))
+		fmt.Println(theme.Faint.Render("Use 'jv add-path <directory>' to add one."))
 	}
+	fmt.Println()
 }
 
 func handleInstall() {
@@ -351,9 +569,54 @@ func handleInstall() {
 	}
 }
 
+func handleSwitch() {
+	// Always interactive - ignore any arguments
+	detector := java.NewDetector()
+	versions, err := detector.FindAll()
+	if err != nil {
+		fmt.Printf("Error finding Java versions: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(versions) == 0 {
+		fmt.Println("No Java installations found.")
+		fmt.Println("Run 'jv install' to install Java.")
+		os.Exit(1)
+	}
+
+	// Show interactive selector
+	target, err := selectJavaVersion(versions)
+	if err != nil {
+		fmt.Printf("Selection cancelled: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Confirm switch
+	confirmed, err := confirmAction(
+		fmt.Sprintf("Switch to Java %s?", target.Version),
+		fmt.Sprintf("Path: %s", target.Path),
+	)
+	if err != nil || !confirmed {
+		fmt.Println("Operation cancelled.")
+		os.Exit(0)
+	}
+
+	fmt.Printf("Switching to Java %s...\n", target.Version)
+
+	if err := env.SetJavaHome(target.Path); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		fmt.Println("\nNote: This command requires administrator privileges.")
+		fmt.Println("Please run your terminal as Administrator and try again.")
+		os.Exit(1)
+	}
+
+	fmt.Println(successStyle.Render("✓ Successfully updated JAVA_HOME!"))
+	fmt.Println()
+	fmt.Println(lipgloss.NewStyle().Faint(true).Render("Note: You may need to restart your terminal or applications for changes to take effect."))
+}
+
 func handleDoctor() {
-	fmt.Println("Java Version Switcher - System Diagnostics")
-	fmt.Println("==========================================")
+	fmt.Println(titleStyle.Render("Java Version Switcher - System Diagnostics"))
 	fmt.Println()
 
 	issues := []string{}
@@ -470,36 +733,49 @@ func handleDoctor() {
 	fmt.Println()
 
 	// Summary
-	fmt.Println("==========================================")
-	fmt.Println("Diagnostics Summary")
-	fmt.Println("==========================================")
+	fmt.Println()
+	fmt.Println(titleStyle.Render("Diagnostics Summary"))
 	fmt.Println()
 
 	if len(issues) == 0 && len(warnings) == 0 {
-		fmt.Println("✓ All checks passed! Your Java environment is properly configured.")
+		successBox := theme.SuccessBox.Render(theme.SuccessMessage("All checks passed!") + "\n\nYour Java environment is properly configured.")
+		fmt.Println(successBox)
 		return
 	}
 
+	// Build summary content
+	var summaryContent string
+
 	if len(issues) > 0 {
-		fmt.Println("Issues found:")
+		summaryContent += errorStyle.Render(fmt.Sprintf("Issues Found: %d", len(issues))) + "\n\n"
 		for _, issue := range issues {
-			fmt.Printf("  ✗ %s\n", issue)
+			summaryContent += theme.ErrorMessage(issue) + "\n"
 		}
-		fmt.Println()
 	}
 
 	if len(warnings) > 0 {
-		fmt.Println("Warnings:")
-		for _, warning := range warnings {
-			fmt.Printf("  ⚠ %s\n", warning)
+		if len(issues) > 0 {
+			summaryContent += "\n"
 		}
-		fmt.Println()
+		summaryContent += warningStyle.Render(fmt.Sprintf("Warnings: %d", len(warnings))) + "\n\n"
+		for _, warning := range warnings {
+			summaryContent += theme.WarningMessage(warning) + "\n"
+		}
 	}
 
 	if len(issues) > 0 {
-		fmt.Println("To fix issues, run: jv repair")
-		fmt.Println("(Note: repair requires administrator privileges for system changes)")
+		summaryContent += "\n" + theme.InfoMessage("Run 'jv repair' to fix issues")
+		summaryContent += "\n" + theme.Faint.Render("  (Note: requires administrator privileges)")
 	}
+
+	fmt.Println(boxStyle.Render(summaryContent))
+}
+
+type RepairIssue struct {
+	ID            string
+	Description   string
+	RequiresAdmin bool
+	CanFix        bool
 }
 
 func handleRepair() {
@@ -511,140 +787,178 @@ func handleRepair() {
 	if !isAdmin {
 		fmt.Println("⚠  Not running as Administrator")
 		fmt.Println("   Some repairs require administrator privileges.")
-		fmt.Println("   Continuing with user-level repairs...")
 		fmt.Println()
 	}
 
 	detector := java.NewDetector()
-	repairs := []string{}
 
-	// 1. Find Java installations
-	fmt.Println("Scanning for Java installations...")
+	// Step 1: Detect all issues
+	fmt.Println("Scanning for issues...")
+	fmt.Println()
+
+	// Find Java installations first
 	versions, err := detector.FindAll()
 	if err != nil {
 		fmt.Printf("✗ Error finding Java versions: %v\n", err)
-		fmt.Println()
-		fmt.Println("Cannot proceed with repair - unable to detect Java installations.")
 		os.Exit(1)
 	}
 
 	if len(versions) == 0 {
 		fmt.Println("✗ No Java installations found.")
-		fmt.Println()
-		fmt.Println("Please install Java first:")
-		fmt.Println("  jv install")
+		fmt.Println("Please install Java first: jv install")
 		os.Exit(1)
 	}
 
-	fmt.Printf("✓ Found %d Java installation(s)\n", len(versions))
-	fmt.Println()
-
-	// 2. Check and fix JAVA_HOME
-	fmt.Println("Checking JAVA_HOME...")
+	// Detect all issues
+	issues := []RepairIssue{}
 	currentJavaHome := os.Getenv("JAVA_HOME")
-	javaHomeNeedsFix := false
 
+	// Issue 1: JAVA_HOME not set or invalid
 	if currentJavaHome == "" {
-		fmt.Println("  ✗ JAVA_HOME is not set")
-		javaHomeNeedsFix = true
+		issues = append(issues, RepairIssue{
+			ID:            "java_home_not_set",
+			Description:   "JAVA_HOME is not set",
+			RequiresAdmin: true,
+			CanFix:        isAdmin,
+		})
 	} else if !detector.IsValidJavaPath(currentJavaHome) {
-		fmt.Printf("  ✗ JAVA_HOME is invalid: %s\n", currentJavaHome)
-		javaHomeNeedsFix = true
-	} else {
-		fmt.Printf("  ✓ JAVA_HOME is valid: %s\n", currentJavaHome)
+		issues = append(issues, RepairIssue{
+			ID:            "java_home_invalid",
+			Description:   fmt.Sprintf("JAVA_HOME is invalid: %s", currentJavaHome),
+			RequiresAdmin: true,
+			CanFix:        isAdmin,
+		})
 	}
 
-	if javaHomeNeedsFix {
-		// Use the first available Java installation
-		targetJava := versions[0]
-		fmt.Printf("  → Setting JAVA_HOME to: %s\n", targetJava.Path)
-
-		if !isAdmin {
-			fmt.Println()
-			fmt.Println("✗ Cannot set JAVA_HOME - requires administrator privileges")
-			fmt.Println("  Please run as administrator and try again:")
-			fmt.Println("    1. Right-click CMD/PowerShell")
-			fmt.Println("    2. Select 'Run as administrator'")
-			fmt.Println("    3. Run: jv repair")
-			fmt.Println()
-			fmt.Println("Or manually set JAVA_HOME to:")
-			fmt.Printf("    %s\n", targetJava.Path)
-			os.Exit(1)
-		}
-
-		if err := env.SetJavaHome(targetJava.Path); err != nil {
-			fmt.Printf("✗ Failed to set JAVA_HOME: %v\n", err)
-			os.Exit(1)
-		}
-
-		repairs = append(repairs, fmt.Sprintf("Set JAVA_HOME to %s", targetJava.Path))
-		repairs = append(repairs, "Added %JAVA_HOME%\\bin to PATH")
-		fmt.Println("  ✓ JAVA_HOME set successfully")
-	}
-	fmt.Println()
-
-	// 3. Check and fix PATH
-	fmt.Println("Checking PATH...")
+	// Issue 2: PATH doesn't contain %JAVA_HOME%\bin
 	pathEnv := os.Getenv("Path")
 	hasJavaHomeInPath := strings.Contains(pathEnv, "%JAVA_HOME%\\bin") || strings.Contains(pathEnv, "%JAVA_HOME%/bin")
+	if !hasJavaHomeInPath && currentJavaHome != "" {
+		issues = append(issues, RepairIssue{
+			ID:            "path_missing_java_home",
+			Description:   "%JAVA_HOME%\\bin is not in PATH",
+			RequiresAdmin: true,
+			CanFix:        isAdmin,
+		})
+	}
 
-	if !hasJavaHomeInPath {
-		if !isAdmin {
-			fmt.Println("  ✗ %JAVA_HOME%\\bin is not in PATH")
-			fmt.Println("     (Cannot fix - requires administrator privileges)")
-		} else {
-			// JAVA_HOME was just set, so PATH should already be updated by SetJavaHome
-			fmt.Println("  ✓ PATH will be updated when JAVA_HOME is set")
+	// Issue 3: Config file problems
+	if _, err := config.Load(); err != nil {
+		issues = append(issues, RepairIssue{
+			ID:            "config_error",
+			Description:   fmt.Sprintf("Configuration file error: %v", err),
+			RequiresAdmin: false,
+			CanFix:        true,
+		})
+	}
+
+	// No issues found
+	if len(issues) == 0 {
+		fmt.Println(successStyle.Render("✓ No issues found - your environment is properly configured!"))
+		return
+	}
+
+	// Show issues
+	fmt.Printf("Found %d issue(s):\n", len(issues))
+	for i, issue := range issues {
+		adminMarker := ""
+		if issue.RequiresAdmin {
+			adminMarker = " [Requires Admin]"
 		}
-	} else {
-		fmt.Println("  ✓ %JAVA_HOME%\\bin is in PATH")
+		if !issue.CanFix {
+			adminMarker += " [Cannot Fix]"
+		}
+		fmt.Printf("  %d. %s%s\n", i+1, issue.Description, adminMarker)
 	}
 	fmt.Println()
 
-	// 4. Verify/repair configuration
-	fmt.Println("Checking configuration...")
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Printf("  ⚠ Error loading config: %v\n", err)
-		fmt.Println("  → Attempting to fix configuration...")
-		// Load() returns a new empty config if file doesn't exist, so if it failed
-		// the file might be corrupted. Try loading again - if it fails again,
-		// the issue is with file permissions or disk, not config format
-		cfg2, err2 := config.Load()
-		if err2 != nil {
-			fmt.Printf("  ✗ Cannot fix configuration: %v\n", err2)
-		} else {
-			// Try to save to create/fix the file
-			if err := cfg2.Save(); err != nil {
-				fmt.Printf("  ✗ Failed to save config: %v\n", err)
-			} else {
-				repairs = append(repairs, "Repaired configuration file")
-				fmt.Println("  ✓ Configuration file repaired")
+	// Filter fixable issues
+	fixableIssues := []RepairIssue{}
+	for _, issue := range issues {
+		if issue.CanFix {
+			fixableIssues = append(fixableIssues, issue)
+		}
+	}
+
+	if len(fixableIssues) == 0 {
+		fmt.Println("✗ No fixable issues (some require administrator privileges)")
+		fmt.Println("  Run as administrator to fix all issues")
+		os.Exit(1)
+	}
+
+	// Interactive selection of issues to fix
+	options := make([]huh.Option[string], len(fixableIssues))
+	for i, issue := range fixableIssues {
+		options[i] = huh.NewOption(issue.Description, issue.ID)
+	}
+
+	var selectedIssues []string
+	err = huh.NewMultiSelect[string]().
+		Title("Select Issues to Fix").
+		Description("Use Space to select, Enter to confirm").
+		Options(options...).
+		Value(&selectedIssues).
+		Run()
+
+	if err != nil || len(selectedIssues) == 0 {
+		fmt.Println("No issues selected. Repair cancelled.")
+		return
+	}
+
+	// Perform repairs
+	fmt.Println()
+	fmt.Println("Performing repairs...")
+	fmt.Println()
+
+	repaired := []string{}
+	for _, issueID := range selectedIssues {
+		switch issueID {
+		case "java_home_not_set", "java_home_invalid":
+			// Let user select which Java to use
+			target, err := selectJavaVersion(versions)
+			if err != nil {
+				fmt.Printf("✗ Skipped JAVA_HOME repair: %v\n", err)
+				continue
+			}
+
+			if err := env.SetJavaHome(target.Path); err != nil {
+				fmt.Printf("✗ Failed to set JAVA_HOME: %v\n", err)
+				continue
+			}
+
+			repaired = append(repaired, fmt.Sprintf("Set JAVA_HOME to %s", target.Path))
+			fmt.Printf("✓ JAVA_HOME set to Java %s\n", target.Version)
+
+		case "path_missing_java_home":
+			// This is handled by SetJavaHome above
+			repaired = append(repaired, "Added %JAVA_HOME%\\bin to PATH")
+			fmt.Println(successStyle.Render("✓ PATH updated"))
+
+		case "config_error":
+			cfg, err := config.Load()
+			if err == nil {
+				if err := cfg.Save(); err == nil {
+					repaired = append(repaired, "Repaired configuration file")
+					fmt.Println(successStyle.Render("✓ Configuration file repaired"))
+				}
 			}
 		}
-	} else {
-		// Config loaded successfully, verify it's saved properly
-		if err := cfg.Save(); err != nil {
-			fmt.Printf("  ⚠ Configuration read but could not verify write: %v\n", err)
-		} else {
-			fmt.Println("  ✓ Configuration file is valid")
-		}
 	}
-	fmt.Println()
 
 	// Summary
+	fmt.Println()
 	fmt.Println("===================================")
-	fmt.Println("Repair Summary")
+	fmt.Println("Repair Complete")
 	fmt.Println("===================================")
 	fmt.Println()
 
-	if len(repairs) == 0 {
-		fmt.Println("✓ No repairs needed - your environment is properly configured!")
+	if len(repaired) == 0 {
+		fmt.Println("✗ No repairs were successful")
 		return
 	}
 
 	fmt.Println("Repairs performed:")
-	for _, repair := range repairs {
+	for _, repair := range repaired {
 		fmt.Printf("  ✓ %s\n", repair)
 	}
 	fmt.Println()
@@ -652,46 +966,195 @@ func handleRepair() {
 }
 
 func printVersion() {
-	fmt.Printf("Java Version Switcher (jv) version %s\n", Version)
-	fmt.Println("https://github.com/CostaBrosky/jv")
+	linkStyle := lipgloss.NewStyle().
+		Foreground(theme.Info).
+		Underline(true)
+
+	fmt.Printf("%s %s %s\n",
+		theme.Subtitle.Render("Java Version Switcher (jv)"),
+		theme.Faint.Render("version"),
+		theme.HighlightText(Version))
+	fmt.Println(linkStyle.Render("https://github.com/CostaBrosky/jv"))
+	fmt.Println()
+
+	// Add features badge
+	fmt.Println(theme.SuccessStyle.Italic(true).Render("✨ Interactive TUI powered by Huh! and Lip Gloss"))
 }
 
 func printUsage() {
-	fmt.Println("Java Version Switcher - Easy Java version management for Windows")
+	// ASCII Art Banner with JV theme
+	banner := `     ██╗██╗   ██╗
+     ██║██║   ██║
+     ██║╚██╗ ██╔╝
+██   ██║ ╚████╔╝ 
+╚█████╔╝  ╚██╔╝  
+ ╚════╝    ╚═╝   `
+
+	fmt.Println(theme.Banner.Render(banner))
+	fmt.Println(theme.Subtitle.Render("Java Version Switcher"))
+	fmt.Println(theme.Faint.Render("Easy Java version management for Windows"))
 	fmt.Println()
-	fmt.Println("Usage: jv <command> [arguments]")
+
+	// Usage section
+	fmt.Println(theme.Title.Render("USAGE"))
+	fmt.Println(theme.Faint.Render("  jv <command> [arguments]"))
 	fmt.Println()
-	fmt.Println("Commands:")
-	fmt.Println("  Version Management:")
-	fmt.Println("    list              List all available Java versions")
-	fmt.Println("    use <version>     Switch to specified Java version")
-	fmt.Println("    current           Show current Java version")
+
+	// Command categories use theme
+	categoryStyle := theme.Subtitle
+	commandStyle := theme.CommandStyle
+	descStyle := theme.Faint
+	interactiveStyle := lipgloss.NewStyle().
+		Foreground(theme.Accent).
+		Italic(true)
+
+	fmt.Println(categoryStyle.Render("INSTALLATION & SETUP"))
+	fmt.Printf("  %s  %s %s\n",
+		commandStyle.Render("install"),
+		descStyle.Render("Install Java from open-source distributors"),
+		interactiveStyle.Render("(interactive)"))
+	fmt.Printf("  %s   %s %s\n",
+		commandStyle.Render("doctor"),
+		descStyle.Render("Run diagnostics on your Java environment"),
+		interactiveStyle.Render("(styled)"))
+	fmt.Printf("  %s   %s %s\n",
+		commandStyle.Render("repair"),
+		descStyle.Render("Automatically fix configuration issues"),
+		interactiveStyle.Render("(interactive)"))
 	fmt.Println()
-	fmt.Println("  Custom Installations:")
-	fmt.Println("    add <path>        Add a specific Java installation")
-	fmt.Println("    remove <path>     Remove a custom installation")
+
+	fmt.Println(categoryStyle.Render("VERSION MANAGEMENT"))
+	fmt.Printf("  %s     %s %s\n",
+		commandStyle.Render("list"),
+		descStyle.Render("List all available Java versions"),
+		interactiveStyle.Render("(styled)"))
+	fmt.Printf("  %s [version]  %s %s\n",
+		commandStyle.Render("use"),
+		descStyle.Render("Switch to Java version"),
+		interactiveStyle.Render("(interactive if no version)"))
+	fmt.Printf("  %s   %s %s\n",
+		commandStyle.Render("switch"),
+		descStyle.Render("Quick interactive version switcher"),
+		interactiveStyle.Render("(always interactive)"))
+	fmt.Printf("  %s  %s\n",
+		commandStyle.Render("current"),
+		descStyle.Render("Show current Java version"))
 	fmt.Println()
-	fmt.Println("  Search Paths:")
-	fmt.Println("    add-path <dir>    Add directory to search for Java installations")
-	fmt.Println("    remove-path <dir> Remove directory from search paths")
-	fmt.Println("    list-paths        Show all search paths (standard + custom)")
+
+	fmt.Println(categoryStyle.Render("CUSTOM INSTALLATIONS"))
+	fmt.Printf("  %s <path>     %s\n",
+		commandStyle.Render("add"),
+		descStyle.Render("Add a specific Java installation"))
+	fmt.Printf("  %s [path]  %s %s\n",
+		commandStyle.Render("remove"),
+		descStyle.Render("Remove a custom installation"),
+		interactiveStyle.Render("(interactive if no path)"))
 	fmt.Println()
-	fmt.Println("  Setup & Maintenance:")
-	fmt.Println("    install           Install Java from open-source distributors")
-	fmt.Println("    doctor            Run diagnostics on your Java environment")
-	fmt.Println("    repair            Automatically fix configuration issues")
+
+	fmt.Println(categoryStyle.Render("SEARCH PATHS"))
+	fmt.Printf("  %s <dir>  %s\n",
+		commandStyle.Render("add-path"),
+		descStyle.Render("Add directory to scan for Java installations"))
+	fmt.Printf("  %s [dir]  %s %s\n",
+		commandStyle.Render("remove-path"),
+		descStyle.Render("Remove directory from search paths"),
+		interactiveStyle.Render("(interactive if no dir)"))
+	fmt.Printf("  %s   %s\n",
+		commandStyle.Render("list-paths"),
+		descStyle.Render("Show all search paths (standard + custom)"))
 	fmt.Println()
-	fmt.Println("  Other:")
-	fmt.Println("    version           Show version information")
-	fmt.Println("    help              Show this help message")
+
+	fmt.Println(categoryStyle.Render("OTHER"))
+	fmt.Printf("  %s  %s\n",
+		commandStyle.Render("version"),
+		descStyle.Render("Show version information"))
+	fmt.Printf("  %s     %s\n",
+		commandStyle.Render("help"),
+		descStyle.Render("Show this help message"))
 	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  jv list")
-	fmt.Println("  jv use 17")
-	fmt.Println("  jv current")
-	fmt.Println("  jv add C:\\custom\\jdk-21")
-	fmt.Println("  jv add-path C:\\DevTools\\Java")
-	fmt.Println("  jv list-paths")
+
+	// Examples section
+	fmt.Println(theme.Title.Render("EXAMPLES"))
+	fmt.Println("  " + theme.Code.Render("jv list") + "                         # List Java versions")
+	fmt.Println("  " + theme.Code.Render("jv switch") + "                       # Interactive switcher")
+	fmt.Println("  " + theme.Code.Render("jv use 17") + "                      # Switch to Java 17")
+	fmt.Println("  " + theme.Code.Render("jv install") + "                     # Install Java interactively")
+	fmt.Println("  " + theme.Code.Render("jv add C:\\custom\\jdk-21") + "        # Add custom installation")
+	fmt.Println("  " + theme.Code.Render("jv doctor") + "                      # Check system health")
 	fmt.Println()
-	fmt.Println("Note: Switching Java versions requires administrator privileges.")
+
+	// Autocomplete note
+	fmt.Println(theme.InfoStyle.Italic(true).Render("💡 Tip: PowerShell autocomplete is installed automatically by install.ps1"))
+
+	fmt.Println()
+
+	// Note section with theme
+	note := theme.WarningBox.Render("⚠ Administrator privileges required for: use, switch, install, repair")
+	fmt.Println(note)
+	fmt.Println()
+
+	// Footer with theme
+	fmt.Println(theme.Faint.Italic(true).Render("For more information: https://github.com/CostaBrosky/jv"))
+}
+
+// selectJavaVersion shows an interactive selector for Java versions
+func selectJavaVersion(versions []java.Version) (*java.Version, error) {
+	// Load config to show scope info
+	cfg, _ := config.Load()
+	scopeMap := make(map[string]string)
+	for _, jdk := range cfg.InstalledJDKs {
+		scopeMap[jdk.Path] = jdk.Scope
+	}
+
+	// Build options
+	options := make([]huh.Option[int], len(versions))
+	for i, v := range versions {
+		label := fmt.Sprintf("%-15s %s", v.Version, v.Path)
+
+		// Add scope info
+		if scope, found := scopeMap[v.Path]; found {
+			switch scope {
+			case "system":
+				label += " (system-wide)"
+			case "user":
+				label += " (user-only)"
+			}
+		} else if v.IsCustom {
+			label += " (custom)"
+		} else {
+			label += " (auto)"
+		}
+
+		options[i] = huh.NewOption(label, i)
+	}
+
+	var selectedIdx int
+
+	err := huh.NewSelect[int]().
+		Title("Select Java Version").
+		Description("Use arrow keys to navigate, Enter to select").
+		Options(options...).
+		Value(&selectedIdx).
+		Run()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &versions[selectedIdx], nil
+}
+
+// confirmAction shows a confirmation prompt
+func confirmAction(title, description string) (bool, error) {
+	var confirmed bool
+
+	err := huh.NewConfirm().
+		Title(title).
+		Description(description).
+		Affirmative("Yes").
+		Negative("No").
+		Value(&confirmed).
+		Run()
+
+	return confirmed, err
 }

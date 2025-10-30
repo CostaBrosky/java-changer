@@ -1,17 +1,18 @@
 package installer
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"jv/internal/config"
 	"jv/internal/env"
 	"jv/internal/java"
+	"jv/internal/theme"
+
+	"github.com/charmbracelet/huh"
 )
 
 // Installer handles the interactive Java installation process
@@ -44,16 +45,16 @@ func NewInstaller(isAdmin bool) (*Installer, error) {
 
 // Run starts the interactive installation process
 func (i *Installer) Run() error {
+	// Styled header with JV theme
+	title := theme.Title.Padding(0, 2).Render("Java Installation Manager")
 	fmt.Println()
-	fmt.Println("=====================================")
-	fmt.Println("   Java Installation Manager")
-	fmt.Println("=====================================")
+	fmt.Println(theme.TitleBox.Render(title))
 	fmt.Println()
 
 	if !i.isAdmin {
-		fmt.Println("⚠  Not running as Administrator")
-		fmt.Println("   Installation will be user-level only")
-		fmt.Println("   JAVA_HOME cannot be set automatically")
+		fmt.Println(theme.WarningMessage("Not running as Administrator"))
+		fmt.Println(theme.Faint.Render("   Installation will be user-level only"))
+		fmt.Println(theme.Faint.Render("   JAVA_HOME cannot be set automatically"))
 		fmt.Println()
 	}
 
@@ -63,105 +64,218 @@ func (i *Installer) Run() error {
 		return err
 	}
 
+	// Step 1.5: Select installation mode
+	mode, err := i.SelectInstallMode()
+	if err != nil {
+		return err
+	}
+
+	if mode == "multi" {
+		return i.RunMultiInstall(distributor)
+	}
+
+	// Single install (existing flow)
+	return i.RunSingleInstall(distributor)
+}
+
+// RunSingleInstall handles single version installation
+func (i *Installer) RunSingleInstall(distributor Distributor) error {
 	// Step 2: Select version
 	version, err := i.ShowVersionMenu(distributor)
 	if err != nil {
 		return err
 	}
 
-	// Step 3: Download and install
-	installedPath, err := i.InstallVersion(distributor, version)
+	// Step 3: Select scope
+	scope, err := i.SelectInstallScope()
 	if err != nil {
 		return err
 	}
 
-	// Step 4: Add to config
-	i.config.AddCustomPath(installedPath)
-
-	// Track installed JDK
-	installedJDK := config.InstalledJDK{
-		Version:     version,
-		Path:        installedPath,
-		Distributor: distributor.Name(),
-		InstalledAt: time.Now().Format(time.RFC3339),
+	// Step 4: Install
+	installedPath, err := i.InstallVersion(distributor, version, scope)
+	if err != nil {
+		return err
 	}
-	i.config.AddInstalledJDK(installedJDK)
+
+	// Step 5: Configure and save
+	return i.finalizeInstallation([]string{installedPath}, []string{version}, scope, distributor.Name())
+}
+
+// RunMultiInstall handles multiple versions installation
+func (i *Installer) RunMultiInstall(distributor Distributor) error {
+	// Step 2: Select multiple versions
+	versions, err := i.SelectMultipleVersions(distributor)
+	if err != nil {
+		return err
+	}
+
+	if len(versions) == 0 {
+		return fmt.Errorf("no versions selected")
+	}
+
+	// Step 3: Select scope (same for all)
+	scope, err := i.SelectInstallScope()
+	if err != nil {
+		return err
+	}
+
+	// Step 4: Install each version
+	fmt.Println()
+	fmt.Printf("Installing %d Java versions...\n", len(versions))
+	fmt.Println()
+
+	installedPaths := []string{}
+	for idx, version := range versions {
+		fmt.Printf("[%d/%d] Installing Java %s...\n", idx+1, len(versions), version)
+
+		installedPath, err := i.InstallVersion(distributor, version, scope)
+		if err != nil {
+			fmt.Printf("❌ Failed to install Java %s: %v\n", version, err)
+			continue
+		}
+
+		installedPaths = append(installedPaths, installedPath)
+		fmt.Printf("✓ Java %s installed successfully\n\n", version)
+	}
+
+	// Step 5: Configure and save
+	return i.finalizeInstallation(installedPaths, versions, scope, distributor.Name())
+}
+
+// finalizeInstallation handles config saving and environment setup
+func (i *Installer) finalizeInstallation(paths []string, versions []string, scope string, distributorName string) error {
+	// Add to config
+	for idx, path := range paths {
+		i.config.AddCustomPath(path)
+
+		installedJDK := config.InstalledJDK{
+			Version:     versions[idx],
+			Path:        path,
+			Distributor: distributorName,
+			InstalledAt: time.Now().Format(time.RFC3339),
+			Scope:       scope,
+		}
+		i.config.AddInstalledJDK(installedJDK)
+	}
 
 	if err := i.config.Save(); err != nil {
 		fmt.Printf("Warning: Failed to save config: %v\n", err)
 	}
 
-	// Step 5: Configure environment if JAVA_HOME not set
-	if err := i.ConfigureEnvironment(installedPath); err != nil {
-		fmt.Printf("\nNote: %v\n", err)
+	// Configure environment for first installation if JAVA_HOME not set
+	if len(paths) > 0 {
+		if err := i.ConfigureEnvironment(paths[0]); err != nil {
+			fmt.Printf("\nNote: %v\n", err)
+		}
+	}
+
+	// Success message with JV theme
+	fmt.Println()
+	title := theme.SuccessStyle.Padding(0, 2).Render("✓ Installation Complete!")
+	fmt.Println(theme.SuccessBox.Render(title))
+	fmt.Println()
+
+	// Installation details
+	if len(paths) == 1 {
+		fmt.Println(theme.LabelStyle.Render(fmt.Sprintf("Java %s installed to:", versions[0])))
+		fmt.Printf("  %s\n", theme.PathStyle.Render(paths[0]))
+	} else {
+		fmt.Println(theme.LabelStyle.Render(fmt.Sprintf("Installed %d Java versions:", len(paths))))
+		for idx, version := range versions {
+			fmt.Printf("  • %s → %s\n",
+				theme.SuccessStyle.Render("Java "+version),
+				theme.PathStyle.Render(paths[idx]))
+		}
 	}
 
 	fmt.Println()
-	fmt.Println("=====================================")
-	fmt.Println("   Installation Complete!")
-	fmt.Println("=====================================")
-	fmt.Println()
-	fmt.Printf("Java %s installed to:\n", version)
-	fmt.Printf("  %s\n", installedPath)
-	fmt.Println()
-	fmt.Println("Next steps:")
-	fmt.Println("  1. Run: jv list")
-	fmt.Println("  2. Run: jv use " + version)
+
+	// Next steps
+	fmt.Println(theme.Subtitle.Render("Next steps:"))
+	fmt.Printf("  %s %s\n", theme.StepStyle.Render("1."), theme.Code.Render("jv list"))
+	fmt.Printf("  %s %s\n", theme.StepStyle.Render("2."), theme.Code.Render("jv use <version>"))
 	fmt.Println()
 
 	return nil
 }
 
+// SelectInstallScope asks user to choose installation scope (admin only)
+func (i *Installer) SelectInstallScope() (string, error) {
+	if !i.isAdmin {
+		// No choice for non-admin users
+		fmt.Println()
+		fmt.Println(theme.InfoMessage("Installing to user directory (administrator required for system-wide)"))
+		return "user", nil
+	}
+
+	var scope string
+
+	err := huh.NewSelect[string]().
+		Title("Select Installation Scope").
+		Description("System-wide requires admin privileges").
+		Options(
+			huh.NewOption("System-wide (recommended) - C:\\Program Files\\...", "system"),
+			huh.NewOption("User-only - %USERPROFILE%\\.jv\\...", "user"),
+		).
+		Value(&scope).
+		Run()
+
+	if err != nil {
+		return "", err
+	}
+
+	return scope, nil
+}
+
 // ShowDistributorMenu displays available distributors and returns the selected one
 func (i *Installer) ShowDistributorMenu() (Distributor, error) {
-	fmt.Println("Available Java Distributors:")
-	fmt.Println()
-	fmt.Println("  1. Eclipse Adoptium (Temurin)  [Active]")
-	fmt.Println("  2. Azul Zulu                    [Coming Soon]")
-	fmt.Println("  3. Amazon Corretto              [Coming Soon]")
-	fmt.Println()
+	var selection string
 
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("Select distributor [1]: ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
+	err := huh.NewSelect[string]().
+		Title("Select Java Distributor").
+		Description("More distributors coming soon").
+		Options(
+			huh.NewOption("Eclipse Adoptium (Temurin)", "adoptium"),
+			// Coming soon: Azul Zulu, Amazon Corretto
+		).
+		Value(&selection).
+		Run()
 
-		if input == "" {
-			input = "1"
-		}
-
-		selection, err := strconv.Atoi(input)
-		if err != nil || selection < 1 || selection > 3 {
-			fmt.Println("Invalid selection. Please enter 1-3")
-			continue
-		}
-
-		if selection != 1 {
-			fmt.Println("This distributor is not yet supported. Please select 1 (Adoptium)")
-			continue
-		}
-
-		return i.distributors[selection], nil
+	if err != nil {
+		return nil, err
 	}
+
+	// Return the distributor based on selection
+	return i.distributors[1], nil // Adoptium for now
 }
 
 // ShowVersionMenu displays available versions and returns the selected one
 func (i *Installer) ShowVersionMenu(distributor Distributor) (string, error) {
-	fmt.Println()
-	fmt.Printf("Fetching available versions from %s...\n", distributor.Name())
+	var releases []JavaRelease
+	var fetchErr error
 
-	releases, err := distributor.GetAvailableVersions()
-	if err != nil {
-		fmt.Printf("Warning: %v\n", err)
+	// Fetch with spinner
+	spinnerErr := WithSpinner(
+		fmt.Sprintf("Fetching available versions from %s...", distributor.Name()),
+		func() error {
+			var err error
+			releases, err = distributor.GetAvailableVersions()
+			fetchErr = err
+			return nil // Don't propagate error, just store it
+		},
+	)
+
+	if spinnerErr != nil {
+		return "", spinnerErr
+	}
+
+	if fetchErr != nil {
+		fmt.Printf("Warning: %v\n", fetchErr)
 	}
 
 	// Get currently installed versions
-	installedVersions, err := i.detector.FindAll()
-	if err != nil {
-		fmt.Printf("Warning: Failed to detect installed versions: %v\n", err)
-		installedVersions = []java.Version{}
-	}
+	installedVersions, _ := i.detector.FindAll()
 
 	// Create map of installed versions for quick lookup
 	installedMap := make(map[string]bool)
@@ -173,104 +287,171 @@ func (i *Installer) ShowVersionMenu(distributor Distributor) (string, error) {
 		}
 	}
 
-	fmt.Println()
-	fmt.Println("Available Java Versions:")
-	fmt.Println()
+	// Build options grouped by LTS/Feature
+	var ltsOptions []huh.Option[string]
+	var featureOptions []huh.Option[string]
 
-	// Show LTS versions first
-	fmt.Println("Long Term Support (LTS):")
-	ltsCount := 0
 	for _, release := range releases {
-		if !release.IsLTS {
-			continue
-		}
-		ltsCount++
-		marker := ""
+		label := fmt.Sprintf("Java %s", release.Version)
 		if installedMap[release.Version] {
-			marker = " [Installed]"
+			label += " [Installed]"
 		}
-		fmt.Printf("  %2s. Java %s%s\n", release.Version, release.Version, marker)
-	}
 
-	// Show feature versions
-	fmt.Println()
-	fmt.Println("Feature Releases:")
-	for _, release := range releases {
+		option := huh.NewOption(label, release.Version)
+
 		if release.IsLTS {
-			continue
+			ltsOptions = append(ltsOptions, option)
+		} else {
+			featureOptions = append(featureOptions, option)
 		}
-		marker := ""
+	}
+
+	// Combine all options
+	allOptions := append(ltsOptions, featureOptions...)
+
+	var selected string
+	err := huh.NewSelect[string]().
+		Title("Select Java Version").
+		Description("Use arrow keys to navigate, Enter to select").
+		Options(allOptions...).
+		Value(&selected).
+		Run()
+
+	if err != nil {
+		return "", err
+	}
+
+	return selected, nil
+}
+
+// SelectMultipleVersions allows installing multiple Java versions at once
+func (i *Installer) SelectMultipleVersions(distributor Distributor) ([]string, error) {
+	var releases []JavaRelease
+	var fetchErr error
+
+	// Fetch with spinner
+	spinnerErr := WithSpinner(
+		fmt.Sprintf("Fetching available versions from %s...", distributor.Name()),
+		func() error {
+			var err error
+			releases, err = distributor.GetAvailableVersions()
+			fetchErr = err
+			return nil
+		},
+	)
+
+	if spinnerErr != nil {
+		return nil, spinnerErr
+	}
+
+	if fetchErr != nil {
+		return nil, fetchErr
+	}
+
+	// Get installed versions
+	installedVersions, _ := i.detector.FindAll()
+	installedMap := make(map[string]bool)
+	for _, iv := range installedVersions {
+		parts := strings.Split(iv.Version, ".")
+		if len(parts) > 0 {
+			installedMap[parts[0]] = true
+		}
+	}
+
+	// Build options
+	var options []huh.Option[string]
+	for _, release := range releases {
+		label := fmt.Sprintf("Java %s", release.Version)
+		if release.IsLTS {
+			label += " [LTS]"
+		}
 		if installedMap[release.Version] {
-			marker = " [Installed]"
+			label += " [Installed]"
 		}
-		fmt.Printf("  %2s. Java %s%s\n", release.Version, release.Version, marker)
+
+		options = append(options, huh.NewOption(label, release.Version))
 	}
 
-	fmt.Println()
-	fmt.Println("Note: LTS versions are recommended for production use")
-	fmt.Println()
+	var selected []string
 
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("Select version to install (or 'q' to quit): ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
+	err := huh.NewMultiSelect[string]().
+		Title("Select Java Versions to Install").
+		Description("Use Space to select, Enter to confirm").
+		Options(options...).
+		Value(&selected).
+		Limit(10). // Show 10 items at a time
+		Run()
 
-		if input == "q" || input == "Q" {
-			return "", fmt.Errorf("installation cancelled")
-		}
-
-		// Validate version exists
-		found := false
-		for _, release := range releases {
-			if release.Version == input {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			fmt.Printf("Invalid version. Please select a valid version or 'q' to quit\n")
-			continue
-		}
-
-		// Warn if already installed
-		if installedMap[input] {
-			fmt.Printf("\nJava %s appears to be already installed.\n", input)
-			fmt.Print("Continue anyway? (y/N): ")
-			confirm, _ := reader.ReadString('\n')
-			confirm = strings.TrimSpace(strings.ToLower(confirm))
-			if confirm != "y" && confirm != "yes" {
-				continue
-			}
-		}
-
-		return input, nil
+	if err != nil {
+		return nil, err
 	}
+
+	return selected, nil
+}
+
+// SelectInstallMode allows choosing between single and multi install
+func (i *Installer) SelectInstallMode() (string, error) {
+	var mode string
+
+	err := huh.NewSelect[string]().
+		Title("Installation Mode").
+		Options(
+			huh.NewOption("Install single version", "single"),
+			huh.NewOption("Install multiple versions (batch)", "multi"),
+		).
+		Value(&mode).
+		Run()
+
+	if err != nil {
+		return "", err
+	}
+
+	return mode, nil
 }
 
 // InstallVersion downloads and installs the selected version
-func (i *Installer) InstallVersion(distributor Distributor, version string) (string, error) {
+func (i *Installer) InstallVersion(distributor Distributor, version string, scope string) (string, error) {
+	// Installation header with JV theme
 	fmt.Println()
-	fmt.Printf("Installing Java %s from %s...\n", version, distributor.Name())
+	fmt.Println(theme.Subtitle.Render(fmt.Sprintf("Installing Java %s from %s", version, distributor.Name())))
 	fmt.Println()
 
 	// Get system architecture
 	arch := runtime.GOARCH
 
-	// Get download URL
-	fmt.Println("Fetching download information...")
-	downloadInfo, err := distributor.GetDownloadURL(version, arch)
-	if err != nil {
-		return "", fmt.Errorf("failed to get download URL: %w", err)
+	// Get download URL with spinner
+	var downloadInfo *DownloadInfo
+	var fetchErr error
+
+	spinnerErr := WithSpinner(
+		"Fetching download information...",
+		func() error {
+			var err error
+			downloadInfo, err = distributor.GetDownloadURL(version, arch)
+			fetchErr = err
+			return nil
+		},
+	)
+
+	if spinnerErr != nil {
+		return "", spinnerErr
 	}
 
-	fmt.Printf("Package: %s\n", downloadInfo.FileName)
-	fmt.Printf("Size: %.2f MB\n", float64(downloadInfo.Size)/1024/1024)
+	if fetchErr != nil {
+		return "", fmt.Errorf("failed to get download URL: %w", fetchErr)
+	}
+
+	// Styled package info with JV theme
+	fmt.Printf("%s %s\n", theme.LabelStyle.Render("Package:"), theme.ValueStyle.Render(downloadInfo.FileName))
+	sizeMB := float64(downloadInfo.Size) / 1024 / 1024
+	fmt.Printf("%s %s\n", theme.LabelStyle.Render("Size:   "), theme.ValueStyle.Render(fmt.Sprintf("%.2f MB", sizeMB)))
 	fmt.Println()
 
+	// Determine isSystemWide based on scope
+	isSystemWide := (scope == "system" && i.isAdmin)
+
 	// Install JDK
-	installedPath, err := InstallJDK(downloadInfo, version, distributor.Name(), i.isAdmin)
+	installedPath, err := InstallJDK(downloadInfo, version, distributor.Name(), isSystemWide)
 	if err != nil {
 		return "", fmt.Errorf("installation failed: %w", err)
 	}
@@ -284,37 +465,37 @@ func (i *Installer) ConfigureEnvironment(jdkPath string) error {
 	currentJavaHome := os.Getenv("JAVA_HOME")
 	if currentJavaHome != "" {
 		fmt.Println()
-		fmt.Println("JAVA_HOME is already set to:")
-		fmt.Printf("  %s\n", currentJavaHome)
+		fmt.Println(theme.InfoStyle.Render("JAVA_HOME is already set to:"))
+		fmt.Printf("  %s\n", theme.PathStyle.Render(currentJavaHome))
 		fmt.Println()
-		fmt.Printf("To use the newly installed Java, run:\n")
-		fmt.Printf("  jv use <version>\n")
+		fmt.Println(theme.Faint.Render("To use the newly installed Java, run:"))
+		fmt.Printf("  %s\n", theme.Code.Render("jv use <version>"))
 		return nil
 	}
 
 	// Need admin privileges to set system environment variables
 	if !i.isAdmin {
 		fmt.Println()
-		fmt.Println("⚠  Cannot set JAVA_HOME automatically (requires administrator)")
+		fmt.Println(theme.WarningMessage("Cannot set JAVA_HOME automatically (requires administrator)"))
 		fmt.Println()
-		fmt.Println("To configure Java, run as administrator:")
-		fmt.Println("  jv repair")
+		fmt.Println(theme.InfoStyle.Render("To configure Java, run as administrator:"))
+		fmt.Printf("  %s\n", theme.Code.Render("jv use <version>"))
 		fmt.Println()
-		fmt.Println("Or manually set JAVA_HOME to:")
-		fmt.Printf("  %s\n", jdkPath)
+		fmt.Println(theme.Faint.Render("Or manually set JAVA_HOME to:"))
+		fmt.Printf("  %s\n", theme.PathStyle.Render(jdkPath))
 		return nil
 	}
 
 	// Set JAVA_HOME
 	fmt.Println()
-	fmt.Println("Configuring JAVA_HOME...")
+	fmt.Println(theme.InfoStyle.Render("Configuring JAVA_HOME..."))
 	if err := env.SetJavaHome(jdkPath); err != nil {
 		return fmt.Errorf("failed to set JAVA_HOME: %w", err)
 	}
 
-	fmt.Println("✓ JAVA_HOME configured successfully")
-	fmt.Printf("  JAVA_HOME = %s\n", jdkPath)
-	fmt.Println("  Added %JAVA_HOME%\\bin to PATH")
+	fmt.Println(theme.SuccessMessage("JAVA_HOME configured successfully"))
+	fmt.Printf("  JAVA_HOME = %s\n", theme.PathStyle.Render(jdkPath))
+	fmt.Println(theme.Faint.Render("  Added %JAVA_HOME%\\bin to PATH"))
 
 	return nil
 }
