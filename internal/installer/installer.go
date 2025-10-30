@@ -13,6 +13,7 @@ import (
 	"jv/internal/theme"
 
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Installer handles the interactive Java installation process
@@ -214,11 +215,11 @@ func (i *Installer) SelectInstallScope() (string, error) {
 	var scope string
 
 	err := huh.NewSelect[string]().
-		Title("Select Installation Scope").
-		Description("System-wide requires admin privileges").
+		Title(theme.Subtitle.Render("Select Installation Scope")).
+		Description(theme.Faint.Render("System-wide requires admin privileges")).
 		Options(
-			huh.NewOption(theme.CommandStyle.Render("System-wide (recommended) - C:\\Program Files\\..."), "system"),
-			huh.NewOption(theme.CommandStyle.Render("User-only - %USERPROFILE%\\.jv\\..."), "user"),
+			huh.NewOption(theme.CurrentStyle.Render("System-wide")+" (recommended) - C\\Program Files\\...", "system"),
+			huh.NewOption(theme.CurrentStyle.Render("User-only")+" - %USERPROFILE%\\.jv\\...", "user"),
 		).
 		Value(&scope).
 		Run()
@@ -235,10 +236,10 @@ func (i *Installer) ShowDistributorMenu() (Distributor, error) {
 	var selection string
 
 	err := huh.NewSelect[string]().
-		Title("Select Java Distributor").
-		Description("More distributors coming soon").
+		Title(theme.Subtitle.Render("Select Java Distributor")).
+		Description(theme.Faint.Render("More distributors coming soon")).
 		Options(
-			huh.NewOption(theme.CommandStyle.Render("Eclipse Adoptium (Temurin)"), "adoptium"),
+			huh.NewOption(theme.CurrentStyle.Render("Eclipse Adoptium")+" (Temurin)", "adoptium"),
 			// Coming soon: Azul Zulu, Amazon Corretto
 		).
 		Value(&selection).
@@ -289,17 +290,41 @@ func (i *Installer) ShowVersionMenu(distributor Distributor) (string, error) {
 		}
 	}
 
-	// Build options grouped by LTS/Feature
+	// Build options grouped by LTS/Feature with themed tags and aligned columns
 	var ltsOptions []huh.Option[string]
 	var featureOptions []huh.Option[string]
 
+	// determine max width for version column (visual)
+	maxW := 0
+	for _, r := range releases {
+		w := lipgloss.Width("Java " + r.Version)
+		if w > maxW {
+			maxW = w
+		}
+	}
+
 	for _, release := range releases {
-		label := fmt.Sprintf("Java %s", release.Version)
-		if installedMap[release.Version] {
-			label += " [Installed]"
+		base := fmt.Sprintf("Java %s", release.Version)
+		vis := lipgloss.Width(base)
+		pad := ""
+		if vis < maxW {
+			pad = strings.Repeat(" ", maxW-vis)
 		}
 
-		option := huh.NewOption(theme.CommandStyle.Render(label), release.Version)
+		// Fixed tag columns: [LTS] and [Installed]
+		ltsCol := strings.Repeat(" ", len("[LTS]"))
+		if release.IsLTS {
+			ltsCol = theme.SuccessStyle.Render("[LTS]")
+		}
+		instCol := strings.Repeat(" ", len("[Installed]"))
+		if installedMap[release.Version] {
+			instCol = theme.InfoStyle.Render("[Installed]")
+		}
+
+		left := theme.CurrentStyle.Render("Java") + " " + release.Version
+		// one space before tags, two spaces between tag columns
+		label := left + pad + " " + ltsCol + "  " + instCol
+		option := huh.NewOption(label, release.Version)
 
 		if release.IsLTS {
 			ltsOptions = append(ltsOptions, option)
@@ -313,8 +338,8 @@ func (i *Installer) ShowVersionMenu(distributor Distributor) (string, error) {
 
 	var selected string
 	err := huh.NewSelect[string]().
-		Title("Select Java Version").
-		Description("Use arrow keys to navigate, Enter to select").
+		Title(theme.Subtitle.Render("Select Java Version")).
+		Description(theme.Faint.Render("Use arrow keys to navigate, Enter to select")).
 		Options(allOptions...).
 		Value(&selected).
 		Run()
@@ -360,25 +385,44 @@ func (i *Installer) SelectMultipleVersions(distributor Distributor) ([]string, e
 		}
 	}
 
-	// Build options
+	// Build options (aligned, with orange prefix and colored tags)
 	var options []huh.Option[string]
-	for _, release := range releases {
-		label := fmt.Sprintf("Java %s", release.Version)
-		if release.IsLTS {
-			label += " [LTS]"
+	// determine max width
+	maxW := 0
+	for _, r := range releases {
+		w := lipgloss.Width("Java " + r.Version)
+		if w > maxW {
+			maxW = w
 		}
-		if installedMap[release.Version] {
-			label += " [Installed]"
+	}
+	for _, release := range releases {
+		base := fmt.Sprintf("Java %s", release.Version)
+		vis := lipgloss.Width(base)
+		pad := ""
+		if vis < maxW {
+			pad = strings.Repeat(" ", maxW-vis)
 		}
 
-		options = append(options, huh.NewOption(theme.CommandStyle.Render(label), release.Version))
+		// Fixed tag columns
+		ltsCol := strings.Repeat(" ", len("[LTS]"))
+		if release.IsLTS {
+			ltsCol = theme.SuccessStyle.Render("[LTS]")
+		}
+		instCol := strings.Repeat(" ", len("[Installed]"))
+		if installedMap[release.Version] {
+			instCol = theme.InfoStyle.Render("[Installed]")
+		}
+
+		left := theme.CurrentStyle.Render("Java") + " " + release.Version
+		label := left + pad + " " + ltsCol + "  " + instCol
+		options = append(options, huh.NewOption(label, release.Version))
 	}
 
 	var selected []string
 
 	err := huh.NewMultiSelect[string]().
-		Title("Select Java Versions to Install").
-		Description("Use Space to select, Enter to confirm").
+		Title(theme.Subtitle.Render("Select Java Versions to Install")).
+		Description(theme.Faint.Render("Use Space to select, Enter to confirm")).
 		Options(options...).
 		Value(&selected).
 		Limit(10). // Show 10 items at a time
@@ -396,10 +440,10 @@ func (i *Installer) SelectInstallMode() (string, error) {
 	var mode string
 
 	err := huh.NewSelect[string]().
-		Title("Installation Mode").
+		Title(theme.Subtitle.Render("Installation Mode")).
 		Options(
-			huh.NewOption(theme.CommandStyle.Render("Install single version"), "single"),
-			huh.NewOption(theme.CommandStyle.Render("Install multiple versions (batch)"), "multi"),
+			huh.NewOption(theme.CurrentStyle.Render("Install")+" single version", "single"),
+			huh.NewOption(theme.CurrentStyle.Render("Install")+" multiple versions (batch)", "multi"),
 		).
 		Value(&mode).
 		Run()

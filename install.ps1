@@ -413,79 +413,79 @@ function Install-Completion {
         # PowerShell completion script (inline, no dependency on jv.exe)
         $completionScript = @'
 # jv completion - begin
-# Auto-generated: robust completion for the "jv" CLI
 
-function Get-JvVersions {
-    try {
-        jv list 2>$null | Select-String -Pattern '^\s*[*→\s]\s*(\S+)' | ForEach-Object {
-            $_.Matches[0].Groups[1].Value
-        }
-    } catch {
-        @()
-    }
-}
+# Defines the completion function
+Register-ArgumentCompleter -Native -CommandName jv -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
 
-function Get-JvSearchPaths {
-    try {
-        # If your CLI supports listing paths, prefer that:
-        # jv list-paths 2>$null
-        @('C:\Program Files\Java', 'C:\Program Files (x86)\Java')
-    } catch {
-        @('C:\Program Files\Java', 'C:\Program Files (x86)\Java')
-    }
-}
-
-# Compatible signature with Windows PowerShell 5.1 and PowerShell 7+
-Register-ArgumentCompleter -CommandName 'jv' -ScriptBlock {
-    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-
+    # Full list of 'jv' commands
     $commands = @(
-        'list','use','switch','current','add','remove',
-        'add-path','remove-path','list-paths','install',
-        'doctor','repair','version','help'
+        'install', 'doctor', 'repair', 'list', 'use', 'switch', 'current',
+        'add', 'remove', 'add-path', 'remove-path', 'list-paths', 'version', 'help'
     )
 
-    $elems = $commandAst.CommandElements
-
-    if ($elems.Count -le 1 -or $elems[1].Extent.Text -like '-*') {
-        $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+    # Gets the main command already entered (e.g., 'jv list <tab>' -> $mainCommand = 'list')
+    $astCommandElements = $commandAst.CommandElements
+    $commandIndex = 1
+    $mainCommand = $null
+    for ($i = 1; $i -lt $astCommandElements.Count; $i++) {
+        if ($astCommandElements[$i].ParameterName -or $i -eq ($astCommandElements.Count - 1) -and $astCommandElements[$i].Extent.StartOffset -lt $cursorPosition) {
+            $mainCommand = $astCommandElements[$i].ToString()
+            $commandIndex = $i
+            break
         }
-        return
     }
 
-    $sub = $elems[1].Extent.Text
+    # Filter commands based on what has already been typed
+    $completions = @()
 
-    switch ($sub) {
-        'use' {
-            Get-JvVersions | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
-                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', ("Java " + $_))
+    # If no main command has been specified, complete with the main commands
+    if (-not $mainCommand -or $commandIndex -eq 1) {
+        $completions = $commands | Where-Object { $_ -like "$wordToComplete*" }
+    }
+    # Otherwise, if the command is 'add', 'remove', 'add-path', 'remove-path', allow path completion
+    elseif ($mainCommand -in 'add', 'remove', 'add-path', 'remove-path') {
+        # If we are at the second argument (after the command), allow path completion
+        if ($commandIndex -eq 2) {
+            # Use PowerShell's path completion
+            $completions = if ($wordToComplete) {
+                try {
+                    Get-ChildItem -Path $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($wordToComplete) -Directory -ErrorAction Ignore | ForEach-Object { $_.Name }
+                } catch {
+                    @()
+                }
+            } else {
+                Get-ChildItem -Path . -Directory -ErrorAction Ignore | ForEach-Object { $_.Name }
             }
-        }
-        'add' {
-            Get-ChildItem -Directory -Path 'C:\Program Files\Java','C:\Program Files (x86)\Java' -ErrorAction SilentlyContinue |
-            ForEach-Object {
-                [System.Management.Automation.CompletionResult]::new($_.FullName, $_.Name, 'ParameterValue', $_.FullName)
+            # If no directories, try files for 'add' and 'remove'
+            if ($completions.Count -eq 0 -and $mainCommand -in 'add', 'remove') {
+                 $completions = if ($wordToComplete) {
+                    try {
+                        Get-ChildItem -Path $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($wordToComplete) -ErrorAction Ignore | ForEach-Object { $_.Name }
+                    } catch {
+                        @()
+                    }
+                } else {
+                    Get-ChildItem -Path . -ErrorAction Ignore | ForEach-Object { $_.Name }
+                }
             }
+            # Add a space after the completed path
+            $completions = $completions | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'Directory', "$_ ") }
+            return $completions
         }
-        'add-path' {
-            Get-ChildItem -Directory -Path $HOME,$PWD -ErrorAction SilentlyContinue |
-            ForEach-Object {
-                [System.Management.Automation.CompletionResult]::new($_.FullName, $_.Name, 'ParameterValue', $_.FullName)
-            }
-        }
-        'remove' {
-            Get-JvVersions | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
-                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-            }
-        }
-        'remove-path' {
-            Get-JvSearchPaths | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
-                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-            }
-        }
-        default {
-            $null
+    }
+    # For all other commands or if the main command has no specific arguments, do not suggest anything else
+    else {
+        # If the main command is found but we are past the first argument and it's not a special case, do not complete with other commands
+        # For example, 'jv use 17 <tab>' should not suggest other 'jv' commands.
+        return @()
+    }
+
+    # If we are here and have commands to complete (like 'jv <tab>' or 'jv u<tab>'), return them
+    if ($completions.Count -gt 0 -and -not ($mainCommand -and $commandIndex -gt 1)) {
+        # Create CompletionResult objects for a cleaner result
+        $completions | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
         }
     }
 }

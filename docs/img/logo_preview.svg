@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <style>
+    .logo-text {
+      font-family: 'Arial', sans-serif;
+      font-weight: bold;
+      font-size: 400px; /* Scalato per adattarsi alle dimensioni maggiori */
+      dominant-baseline: middle;
+      text-anchor: middle;
+      fill: #FFA500; /* Colore orange per le lettere JV */
+    }
+  </style>
+  <rect width="1280" height="640" fill="white" />
+  <text x="640" y="320" class="logo-text">JV</text>
+</svg>

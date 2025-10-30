@@ -43,6 +43,10 @@ func (d *Detector) FindAll() ([]Version, error) {
 		searchPaths = append(searchPaths, cfg.SearchPaths...)
 	}
 
+	// Use a map to deduplicate by path (case-insensitive)
+	type item struct{ v Version }
+	seen := make(map[string]item)
+
 	// Auto-detect from all search paths (standard + custom)
 	for _, basePath := range searchPaths {
 		if _, err := os.Stat(basePath); os.IsNotExist(err) {
@@ -62,11 +66,8 @@ func (d *Detector) FindAll() ([]Version, error) {
 			javaPath := filepath.Join(basePath, entry.Name())
 			if d.IsValidJavaPath(javaPath) {
 				version := d.GetVersion(javaPath)
-				versions = append(versions, Version{
-					Version:  version,
-					Path:     javaPath,
-					IsCustom: false,
-				})
+				key := strings.ToLower(filepath.Clean(javaPath))
+				seen[key] = item{v: Version{Version: version, Path: filepath.Clean(javaPath), IsCustom: false}}
 			}
 		}
 	}
@@ -75,14 +76,18 @@ func (d *Detector) FindAll() ([]Version, error) {
 	if err == nil {
 		for _, customPath := range cfg.CustomPaths {
 			if d.IsValidJavaPath(customPath) {
-				version := d.GetVersion(customPath)
-				versions = append(versions, Version{
-					Version:  version,
-					Path:     customPath,
-					IsCustom: true,
-				})
+				norm := filepath.Clean(customPath)
+				key := strings.ToLower(norm)
+				version := d.GetVersion(norm)
+				// If already seen as auto, upgrade to custom; else add as custom
+				seen[key] = item{v: Version{Version: version, Path: norm, IsCustom: true}}
 			}
 		}
+	}
+
+	// Materialize map to slice
+	for _, it := range seen {
+		versions = append(versions, it.v)
 	}
 
 	return versions, nil
