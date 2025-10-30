@@ -144,8 +144,14 @@ func handleList() {
 	fmt.Println()
 
 	if current == "" {
-		fmt.Println(theme.WarningMessage("JAVA_HOME is not set"))
-		fmt.Println(theme.Faint.Render("  Run 'jv use <version>' or 'jv switch' to configure"))
+		// If system-wide JAVA_HOME exists in registry, suggest restart instead
+		if sysJavaHome, err := env.GetJavaHome(); err == nil && sysJavaHome != "" {
+			fmt.Println(theme.InfoMessage(" JAVA_HOME is set system-wide, but not visible in this session"))
+			fmt.Println(theme.Faint.Render("  Restart your terminal to pick up environment changes"))
+		} else {
+			fmt.Println(theme.WarningMessage(" JAVA_HOME is not set"))
+			fmt.Println(theme.Faint.Render("  Run 'jv use <version>' or 'jv switch' to configure"))
+		}
 	}
 }
 
@@ -299,7 +305,7 @@ func handleRemove() {
 		for i, path := range cfg.CustomPaths {
 			version := detector.GetVersion(path)
 			label := fmt.Sprintf("%s - %s", version, path)
-			options[i] = huh.NewOption(label, path)
+			options[i] = huh.NewOption(theme.CommandStyle.Render(label), path)
 		}
 
 		err := huh.NewSelect[string]().
@@ -414,7 +420,7 @@ func handleRemovePath() {
 		// Build options
 		options := make([]huh.Option[string], len(cfg.SearchPaths))
 		for i, path := range cfg.SearchPaths {
-			options[i] = huh.NewOption(path, path)
+			options[i] = huh.NewOption(theme.PathStyle.Render(path), path)
 		}
 
 		err := huh.NewSelect[string]().
@@ -889,7 +895,7 @@ func handleRepair() {
 	// Interactive selection of issues to fix
 	options := make([]huh.Option[string], len(fixableIssues))
 	for i, issue := range fixableIssues {
-		options[i] = huh.NewOption(issue.Description, issue.ID)
+		options[i] = huh.NewOption(theme.WarningStyle.Render(issue.Description), issue.ID)
 	}
 
 	var selectedIssues []string
@@ -1125,7 +1131,7 @@ func selectJavaVersion(versions []java.Version) (*java.Version, error) {
 			label += " (auto)"
 		}
 
-		options[i] = huh.NewOption(label, i)
+		options[i] = huh.NewOption(theme.CommandStyle.Render(label), i)
 	}
 
 	var selectedIdx int

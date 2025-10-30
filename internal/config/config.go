@@ -57,6 +57,23 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// Sanitize: remove empty custom paths
+	cleaned := make([]string, 0, len(cfg.CustomPaths))
+	seen := make(map[string]bool)
+	for _, p := range cfg.CustomPaths {
+		p = filepath.Clean(strings.TrimSpace(p))
+		if p == "" || p == "." {
+			continue
+		}
+		key := strings.ToLower(p)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		cleaned = append(cleaned, p)
+	}
+	cfg.CustomPaths = cleaned
+
 	cfg.configPath = configPath
 	return cfg, nil
 }
@@ -82,7 +99,11 @@ func (c *Config) Save() error {
 // AddCustomPath adds a custom Java installation path
 func (c *Config) AddCustomPath(path string) {
 	// Normalize path
-	path = filepath.Clean(path)
+	path = filepath.Clean(strings.TrimSpace(path))
+
+	if path == "" || path == "." {
+		return
+	}
 
 	// Check if already exists
 	for _, p := range c.CustomPaths {

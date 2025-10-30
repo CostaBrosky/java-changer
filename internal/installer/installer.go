@@ -147,7 +147,9 @@ func (i *Installer) RunMultiInstall(distributor Distributor) error {
 func (i *Installer) finalizeInstallation(paths []string, versions []string, scope string, distributorName string) error {
 	// Add to config
 	for idx, path := range paths {
-		i.config.AddCustomPath(path)
+		if strings.EqualFold(scope, "user") {
+			i.config.AddCustomPath(path)
+		}
 
 		installedJDK := config.InstalledJDK{
 			Version:     versions[idx],
@@ -215,8 +217,8 @@ func (i *Installer) SelectInstallScope() (string, error) {
 		Title("Select Installation Scope").
 		Description("System-wide requires admin privileges").
 		Options(
-			huh.NewOption("System-wide (recommended) - C:\\Program Files\\...", "system"),
-			huh.NewOption("User-only - %USERPROFILE%\\.jv\\...", "user"),
+			huh.NewOption(theme.CommandStyle.Render("System-wide (recommended) - C:\\Program Files\\..."), "system"),
+			huh.NewOption(theme.CommandStyle.Render("User-only - %USERPROFILE%\\.jv\\..."), "user"),
 		).
 		Value(&scope).
 		Run()
@@ -236,7 +238,7 @@ func (i *Installer) ShowDistributorMenu() (Distributor, error) {
 		Title("Select Java Distributor").
 		Description("More distributors coming soon").
 		Options(
-			huh.NewOption("Eclipse Adoptium (Temurin)", "adoptium"),
+			huh.NewOption(theme.CommandStyle.Render("Eclipse Adoptium (Temurin)"), "adoptium"),
 			// Coming soon: Azul Zulu, Amazon Corretto
 		).
 		Value(&selection).
@@ -297,7 +299,7 @@ func (i *Installer) ShowVersionMenu(distributor Distributor) (string, error) {
 			label += " [Installed]"
 		}
 
-		option := huh.NewOption(label, release.Version)
+		option := huh.NewOption(theme.CommandStyle.Render(label), release.Version)
 
 		if release.IsLTS {
 			ltsOptions = append(ltsOptions, option)
@@ -369,7 +371,7 @@ func (i *Installer) SelectMultipleVersions(distributor Distributor) ([]string, e
 			label += " [Installed]"
 		}
 
-		options = append(options, huh.NewOption(label, release.Version))
+		options = append(options, huh.NewOption(theme.CommandStyle.Render(label), release.Version))
 	}
 
 	var selected []string
@@ -396,8 +398,8 @@ func (i *Installer) SelectInstallMode() (string, error) {
 	err := huh.NewSelect[string]().
 		Title("Installation Mode").
 		Options(
-			huh.NewOption("Install single version", "single"),
-			huh.NewOption("Install multiple versions (batch)", "multi"),
+			huh.NewOption(theme.CommandStyle.Render("Install single version"), "single"),
+			huh.NewOption(theme.CommandStyle.Render("Install multiple versions (batch)"), "multi"),
 		).
 		Value(&mode).
 		Run()

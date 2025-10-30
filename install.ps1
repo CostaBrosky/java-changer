@@ -516,7 +516,7 @@ Register-ArgumentCompleter -CommandName jv -ScriptBlock {
         }
         'completion' {
             @('powershell', 'bash', 'fish') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
-                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', "$_ shell completion")
+                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', 'Shell completion')
             }
         }
     }
