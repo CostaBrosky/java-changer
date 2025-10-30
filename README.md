@@ -8,7 +8,9 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A fast CLI for switching Java versions on Windows. It detects installed JDKs, lets you pick one interactively, and updates `JAVA_HOME` and `PATH` accordingly. Interactive UIs are built with the [Charm toolkit](https://github.com/charmbracelet) (Huh for prompts, Lip Gloss for styling).
+A fast CLI for switching Java versions on Windows. It detects installed JDKs, lets you pick one interactively, and updates `JAVA_HOME` and `PATH` accordingly. 
+
+Interactive UIs are built with the [Charm toolkit](https://github.com/charmbracelet) (Huh for prompts, Lip Gloss for styling).
 
 ## Install
 
